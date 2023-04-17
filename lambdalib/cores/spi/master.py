@@ -61,9 +61,8 @@ class LiteSPISDRPHYCore(Elaboratable):
         ]
 
         # CS control.
-        cs_timer  = WaitTimer(self.cs_delay + 1) # Ensure cs_delay cycles between XFers.
+        m.submodules.cs_timer = cs_timer = WaitTimer(self.cs_delay + 1) # Ensure cs_delay cycles between XFers.
         cs_enable = Signal()
-        m.submodules += cs_timer
         m.d.comb += cs_timer.wait.eq(self.cs)
         m.d.comb += cs_enable.eq(cs_timer.done)
         m.d.comb += pads.cs_n.eq(~cs_enable)
