@@ -40,8 +40,10 @@ class USBGenericDevice(Elaboratable):
 
         self.kwargs = kwargs
 
-        self.sinks   = [stream.Endpoint(usb_ep_description) for _ in range(ep_pairs)]
-        self.sources = [stream.Endpoint(usb_ep_description) for _ in range(ep_pairs)]
+        self.sinks   = [stream.Endpoint(usb_ep_description, name="sink_" + str(i))
+                            for i in range(ep_pairs)]
+        self.sources = [stream.Endpoint(usb_ep_description, name="source_" + str(i))
+                            for i in range(ep_pairs)]
         # For convenience
         if ep_pairs == 1:
             self.sink   = self.sinks[0]
