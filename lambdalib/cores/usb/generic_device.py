@@ -48,6 +48,10 @@ class USBGenericDevice(Elaboratable):
         if ep_pairs == 1:
             self.sink   = self.sinks[0]
             self.source = self.sources[0]
+        else:
+            for i in range(self.ep_pairs):
+                setattr(self, "sink_"   + str(i), self.sinks[i])
+                setattr(self, "source_" + str(i), self.sources[i])
 
         self.max_packet_size = self.BULK_PACKET_SIZE_HS if hasattr(pins, "dir") \
                           else self.BULK_PACKET_SIZE_FS
