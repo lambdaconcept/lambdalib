@@ -107,6 +107,9 @@ class StreamSimReceiver:
                     val = (yield getattr(source, name))
                     current[name] = val
                     self.data[name].append(val)
+                    if self.verbose:
+                        if val:
+                            print(self.strname, "\t", "[{}]".format(name))
 
                 if self.callback:
                     self.callback(current)
