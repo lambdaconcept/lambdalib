@@ -22,7 +22,7 @@ from ..time.timer import *
 __all__ = ["SPIPHYMaster"]
 
 
-def SPIPHYMaster(pins, sys_clk_freq, spi_clk_freq=10e6, cs_delay=10):
+def SPIPHYMaster(pins, sys_clk_freq, spi_clk_freq=10e6, spi_cs_delay=2):
         # It seems that LiteSPISDRPHYCore does not support frequencies
         # higher than sys_clk_freq / 4.
         max_freq = sys_clk_freq // 4
@@ -30,6 +30,7 @@ def SPIPHYMaster(pins, sys_clk_freq, spi_clk_freq=10e6, cs_delay=10):
             spi_clk_freq = max_freq
             logging.warning("SPIPHYMaster clock frequency limited to: {} Hz".format(spi_clk_freq))
         div = math.ceil((sys_clk_freq / spi_clk_freq / 2) - 1)
+        cs_delay = math.ceil(spi_cs_delay * sys_clk_freq / spi_clk_freq)
         return LiteSPISDRPHYCore(pins, default_divisor=div, cs_delay=cs_delay)
 
 
