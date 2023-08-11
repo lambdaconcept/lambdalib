@@ -15,7 +15,7 @@ __all__ = ["IIRFilter"]
 class IIRFilter(Elaboratable):
     def __init__(self, order, cutoff, samplerate, ripple=0.5,
                  filtertype="ellip", bandtype="lowpass", dynamic=False,
-                 width=16, multiply_width=(25, 36)):
+                 width=16, multiply_width=(25, 36), use_external_multiply=False):
         self.order = order
         self.cutoff = cutoff
         self.samplerate = samplerate
@@ -23,6 +23,7 @@ class IIRFilter(Elaboratable):
         self.width = width
         self.width_s = width_s = multiply_width[0]
         self.width_c = width_c = multiply_width[1]
+        self.use_external_multiply = use_external_multiply
 
         # Convert ripple from percent to dB
         rp = -20 * math.log10(1 - (ripple / 100))
@@ -74,6 +75,13 @@ class IIRFilter(Elaboratable):
         assert(self.shift_s >= 0)
         print(f"signal shift: {self.shift_s}")
 
+        # Create multiplier streams when using an external instance
+        if use_external_multiply:
+            self.mult_i = stream.Endpoint(
+                    multiplier_layout_i(signed(width_s), signed(width_c)))
+            self.mult_o = stream.Endpoint(
+                    multiplier_layout_o(signed(width_s), signed(width_c)))
+
 
     def elaborate(self, platform):
         sink = self.sink
@@ -92,12 +100,23 @@ class IIRFilter(Elaboratable):
         o_regs = Array([Signal(signed(width_s), name=f"o_reg_{i}")
                        for i in range(size)])
 
-        m.submodules.mult = \
-                     mult = Multiplier(signed(width_s), signed(width_c))
-        c_r         = Signal.like(mult.o.c)
+        if self.use_external_multiply:
+            mult_i = self.mult_i
+            mult_o = self.mult_o
+        else:
+            m.submodules.mult = \
+                         mult = Multiplier(signed(width_s), signed(width_c))
+            mult_i = mult.i
+            mult_o = mult.o
+
+        c_r         = Signal.like(mult_o.c)
         valid_r     = Signal()
         last_r      = Signal()
-        sum_r       = Signal.like(mult.o.c)
+        sum_r       = Signal.like(mult_o.c)
+
+        # Preserve first and last signals from the sink to the source
+        sink_first = Signal()
+        sink_last  = Signal()
 
 
         with m.FSM() as fsm:
@@ -107,6 +126,10 @@ class IIRFilter(Elaboratable):
 
                 m.d.comb += sink.ready.eq(1)
                 with m.If(sink.valid):
+                    m.d.sync += [
+                        sink_first.eq(sink.first),
+                        sink_last .eq(sink.last),
+                    ]
 
                     m.d.sync += i_regs[0].eq(sink.data << shift_s)
                     for i in range(size - 1):
@@ -121,11 +144,11 @@ class IIRFilter(Elaboratable):
             with m.State("RUN_B"):
                 # Queue B x I mults
                 m.d.comb += [
-                    mult.i.a    .eq(     i_regs[idx]),
-                    mult.i.b    .eq(self.b_regs[idx]),
-                    mult.i.valid.eq(1),
+                    mult_i.a    .eq(     i_regs[idx]),
+                    mult_i.b    .eq(self.b_regs[idx]),
+                    mult_i.valid.eq(1),
                 ]
-                with m.If(mult.i.ready):
+                with m.If(mult_i.ready):
                     with m.If(idx < (size-1)):
                         m.d.sync += idx.eq(idx + 1)
                     with m.Else():
@@ -135,12 +158,12 @@ class IIRFilter(Elaboratable):
             with m.State("RUN_A"):
                 # Queue A x O mults
                 m.d.comb += [
-                    mult.i.a    .eq(     o_regs[idx]),
-                    mult.i.b    .eq(self.a_regs[idx]),
-                    mult.i.valid.eq(1),
-                    mult.i.last .eq(idx == (size-1)),
+                    mult_i.a    .eq(     o_regs[idx]),
+                    mult_i.b    .eq(self.a_regs[idx]),
+                    mult_i.valid.eq(1),
+                    mult_i.last .eq(idx == (size-1)),
                 ]
-                with m.If(mult.i.ready):
+                with m.If(mult_i.ready):
                     with m.If(idx < (size-1)):
                         m.d.sync += idx.eq(idx + 1)
                     with m.Else():
@@ -158,17 +181,19 @@ class IIRFilter(Elaboratable):
                 m.d.comb += [
                     source.valid.eq(1),
                     source.data .eq(sum_r >> (shift_c + shift_s)),
+                    source.first.eq(sink_first),
+                    source.last .eq(sink_last),
                 ]
                 with m.If(source.ready):
                     m.next = "IDLE"
 
 
         # Store multiply results
-        m.d.comb += mult.o.ready.eq(1)
+        m.d.comb += mult_o.ready.eq(1)
         m.d.sync += [
-            c_r    .eq(mult.o.c),
-            valid_r.eq(mult.o.valid),
-            last_r .eq(mult.o.last),
+            c_r    .eq(mult_o.c),
+            valid_r.eq(mult_o.valid),
+            last_r .eq(mult_o.last),
         ]
 
         # Compute the sum
