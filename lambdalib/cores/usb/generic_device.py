@@ -53,8 +53,8 @@ class USBGenericDevice(Elaboratable):
                 setattr(self, "sink_"   + str(i), self.sinks[i])
                 setattr(self, "source_" + str(i), self.sources[i])
 
-        self.max_packet_size = self.BULK_PACKET_SIZE_HS if hasattr(pins, "dir") \
-                          else self.BULK_PACKET_SIZE_FS
+        self.max_packet_size = self.BULK_PACKET_SIZE_FS if hasattr(pins, "d_n") \
+                          else self.BULK_PACKET_SIZE_HS
 
         self.tx_activity = Signal(self.ep_pairs)
         self.rx_activity = Signal(self.ep_pairs)
