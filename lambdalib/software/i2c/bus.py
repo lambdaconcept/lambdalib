@@ -18,6 +18,33 @@ class I2CBus:
         self.dev = dev
         self.reg_addr_width = reg_addr_width
 
+    def write_byte_data(self, addr, reg, data):
+        self.write_block_data(addr, reg, [data])
+
+    def read_byte_data(self, addr, reg):
+        return self.read_block_data(addr, reg, 1)[0]
+
+    def write_block_data(self, addr, reg, data):
+        reg_addr_size = self.reg_addr_width // 8
+        reg_addr_array = []
+        for _ in range(reg_addr_size):
+            reg_addr_array.append(reg & 0xff)
+            reg = reg >> 8
+        reg_addr_array.reverse()
+
+        size = reg_addr_size + len(data)
+        array = reg_addr_array + data
+
+        # write register address and data
+        buffer = bytearray([(addr << 1) | I2C_WRITE, size, *array])
+        self.dev.write(buffer)
+
+        status = self.dev.read(1)[0]
+        if status != STATUS_OK:
+            return None
+
+        return len(data)
+
     def read_block_data(self, addr, reg, length):
         reg_addr_size = self.reg_addr_width // 8
         reg_addr_array = []
