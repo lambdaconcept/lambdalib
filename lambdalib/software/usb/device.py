@@ -12,6 +12,10 @@ class USBEndpoint():
         self.size = size
         self.num = num
 
+        # function alias
+        self.write = self.send
+        self.read = self.recv
+
     def send(self, data):
         self.handle.bulkWrite(self.num, bytearray(data), timeout=1000)
 
