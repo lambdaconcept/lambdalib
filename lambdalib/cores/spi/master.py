@@ -100,7 +100,7 @@ class LiteSPISDRPHYCore(Elaboratable):
                     m.d.comb += dq_o.eq(sr_out[-i:])
 
         with m.If(sr_out_load):
-            m.d.sync += sr_out.eq(sink.data << (len(sink.data) - sink.len))
+            m.d.sync += sr_out.eq(sink.data << (len(sink.data) - sink.len).as_unsigned())
 
         with m.If(sr_out_shift):
             with m.Switch(sink.width):
