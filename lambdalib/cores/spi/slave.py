@@ -11,10 +11,13 @@ __all__ = ["SPIPHYSlave"]
 
 
 class SPIPHYSlave(Elaboratable):
+    """
+    Limitation: does not put last on the source stream.
+    """
     def __init__(self, pins,
             cpol=0, cpha=0,
             # XXX doc for stages
-            width=32, stages=None):
+            width=32, with_len=True, stages=None):
 
         if pins is None:
             pins = SPIPinsStub()
@@ -23,14 +26,18 @@ class SPIPHYSlave(Elaboratable):
         self.cpha = cpha
 
         self.width = width
+        self.with_len = with_len
+        if not with_len:
+            assert(stages is None)
         if stages is None:
             stages = [width]
         for n in stages:
             assert(n <= width)
         self.stages = stages
 
-        self.sink = stream.Endpoint(spi_slave_layout(width))
-        self.fifo = stream.SyncFIFO(spi_slave_layout(width), 8, buffered=True)
+        layout = spi_slave_layout(width, with_len=with_len)
+        self.sink = stream.Endpoint(layout)
+        self.fifo = stream.SyncFIFO(layout, 8, buffered=True)
         self.source = self.fifo.source
 
     def elaborate(self, platform):
@@ -65,15 +72,21 @@ class SPIPHYSlave(Elaboratable):
             sample = fall
             update = rise
 
+        if self.with_len:
+            wdlen = sink.len
+            wdshift = (len(sink.data) - wdlen).as_unsigned()
+        else:
+            wdlen = self.width
+            wdshift = (len(sink.data) - wdlen)
+
         # MOSI (input) data path
-        cnt_in = Signal.like(fifo.sink.len, reset=0)
-        reg_in = Signal.like(fifo.sink.data)
+        cnt_in = Signal(range(self.width + 1))
+        reg_in = Signal(self.width)
         end = ((cnt_in > 0) & ~en)
 
-        m.d.comb += [
-            fifo.sink.data.eq(reg_in),
-            fifo.sink.len.eq(cnt_in),
-        ]
+        m.d.comb += fifo.sink.data.eq(reg_in)
+        if self.with_len:
+            m.d.comb += fifo.sink.len.eq(cnt_in)
 
         # MOSI presplit in stages
         nbits = Array(self.stages)
@@ -97,16 +110,16 @@ class SPIPHYSlave(Elaboratable):
                 m.d.sync += idx.eq(idx + 1)
 
         # MISO (output) data path
-        cnt_out = Signal.like(sink.len, reset=0)
-        reg_out = Signal.like(sink.data)
+        cnt_out = Signal(range(self.width + 1))
+        reg_out = Signal(self.width)
 
         # MISO stream in
         with m.If(cnt_out == 0):
             m.d.comb += sink.ready.eq(1)
             with m.If(sink.valid):
                 m.d.sync += [
-                    reg_out.eq(sink.data << (len(sink.data) - sink.len).as_unsigned()),
-                    cnt_out.eq(sink.len),
+                    reg_out.eq(sink.data << wdshift),
+                    cnt_out.eq(wdlen),
                 ]
 
         # MISO shift out

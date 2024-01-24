@@ -14,11 +14,11 @@ spi_phy2core_layout = [
     ("data", 32),
 ]
 
-def spi_slave_layout(width):
-    return [
-        ("data", width),
-        ("len", range(width + 1)),
-    ]
+def spi_slave_layout(width, with_len=True):
+    layout = [("data", width)]
+    if with_len:
+        layout += [("len", range(width + 1))]
+    return layout
 
 class SPIPinsStub(Record):
     def __init__(self):
