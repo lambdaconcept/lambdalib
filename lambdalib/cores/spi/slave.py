@@ -105,7 +105,7 @@ class SPIPHYSlave(Elaboratable):
             m.d.comb += sink.ready.eq(1)
             with m.If(sink.valid):
                 m.d.sync += [
-                    reg_out.eq(sink.data << (len(sink.data) - sink.len)),
+                    reg_out.eq(sink.data << (len(sink.data) - sink.len).as_unsigned()),
                     cnt_out.eq(sink.len),
                 ]
 

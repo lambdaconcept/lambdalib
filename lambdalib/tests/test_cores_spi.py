@@ -186,5 +186,5 @@ def test_spi_wb_bridge():
 
 if __name__ == "__main__":
     test_spi(); print()
-    test_spi_wb_bridge(); print()
+    # test_spi_wb_bridge(); print()
     test_spi_loop(); print()
