@@ -20,9 +20,10 @@ class SPIMasterBridge(Elaboratable):
 
     This can be used to act as a SPI master from the PC.
     """
-    def __init__(self, sys_clk_freq, spi_freq=24e6, has_ulpi=True):
+    def __init__(self, sys_clk_freq, spi_freq=24e6, spi_width=1, has_ulpi=True):
         self.sys_clk_freq = sys_clk_freq
         self.spi_freq = spi_freq
+        self.spi_width = spi_width
         self.has_ulpi = has_ulpi
 
     def elaborate(self, platform):
@@ -37,14 +38,14 @@ class SPIMasterBridge(Elaboratable):
                                                     vid=0xffff, pid=0x1234)
 
         # Create the SPI PHY.
-        spi_pins = platform.request("spi", 0)
+        spi_pins = platform.request("spi", 0 if self.spi_width == 1 else 1)
         m.submodules.spi_phy = spi_phy = SPIPHYMaster(
             spi_pins, self.sys_clk_freq,
             spi_clk_freq=self.spi_freq,
         )
 
         # Create the USB-SPI bridge
-        m.submodules.api = api = SPIStream()
+        m.submodules.api = api = SPIStream(bus_width=self.spi_width)
 
         m.d.comb += [
             spi_phy.cs.eq(api.cs),
@@ -76,8 +77,14 @@ def build_ecpix_master(top):
         Resource("spi", 0,
             Subsignal("mosi", Pins("1", dir="o", conn=("pmod", 0))),
             Subsignal("miso", Pins("2", dir="i", conn=("pmod", 0))),
-            Subsignal("cs_n", Pins("3", dir="o", conn=("pmod", 0))),
-            Subsignal("clk",  Pins("4", dir="o", conn=("pmod", 0))),
+            Subsignal("cs_n", Pins("7", dir="o", conn=("pmod", 0))),
+            Subsignal("clk",  Pins("8", dir="o", conn=("pmod", 0))),
+            Attrs(IO_TYPE="LVCMOS33"),
+        ),
+        Resource("spi", 1,
+            Subsignal("dq",   Pins("1 2 3 4", dir="io", conn=("pmod", 0))),
+            Subsignal("cs_n", Pins("7", dir="o", conn=("pmod", 0))),
+            Subsignal("clk",  Pins("8", dir="o", conn=("pmod", 0))),
             Attrs(IO_TYPE="LVCMOS33"),
         ),
     ])
@@ -93,9 +100,13 @@ if __name__ == "__main__":
     parser.add_argument("--platform", choices=("ecpix"),
                         default="ecpix",
                         help="platform variant (default: %(default)s)")
+    parser.add_argument("--width", choices=("1", "2", "4", "8"),
+                        default="1",
+                        help="spi bus width (default: %(default)s)")
 
     args = parser.parse_args()
 
     if args.platform == "ecpix":
-        master = SPIMasterBridge(100e6, spi_freq=25e6, has_ulpi=True)
+        master = SPIMasterBridge(100e6, spi_freq=25e6, spi_width=int(args.width),
+                                 has_ulpi=True)
         build_ecpix_master(master)

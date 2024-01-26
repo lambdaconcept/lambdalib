@@ -41,10 +41,10 @@ class LiteSPISDRPHYCore(Elaboratable):
         assert(default_divisor >= 1)
         self.pads             = pads
         self.cs_delay         = cs_delay
-        self.source           = source = stream.Endpoint(spi_phy2core_layout)
-        self.sink             = sink   = stream.Endpoint(spi_core2phy_layout)
+        self.source           = stream.Endpoint(spi_phy2core_layout)
+        self.sink             = stream.Endpoint(spi_core2phy_layout)
         self.cs               = Signal()
-        self.spi_clk_divisor = Signal(8, reset=default_divisor)
+        self.spi_clk_divisor  = Signal(8, reset=default_divisor)
 
     def elaborate(self, platform):
         sink = self.sink
@@ -77,7 +77,14 @@ class LiteSPISDRPHYCore(Elaboratable):
                 dq_i[1].eq(pads.miso),
             ]
         else:
-            raise NotImplementedError
+            dq_o  = Signal(len(pads.dq))
+            dq_i  = Signal(len(pads.dq))
+            dq_oe = Signal(len(pads.dq))
+            m.d.comb += [
+                pads.dq.o.eq(dq_o),
+                pads.dq.oe.eq(dq_oe),
+                dq_i.eq(pads.dq.i),
+            ]
 
         if hasattr(pads, "hold_n"):
             m.d.comb += pads.hold_n.eq(1)

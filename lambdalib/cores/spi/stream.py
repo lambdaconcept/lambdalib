@@ -15,7 +15,9 @@ spi_stream_layout = [
 
 
 class SPIStream(Elaboratable):
-    def __init__(self):
+    def __init__(self, bus_width=1):
+        self.bus_width = bus_width
+
         self.cs = Signal()
 
         self.phy_sink    = stream.Endpoint(spi_phy2core_layout)
@@ -38,8 +40,8 @@ class SPIStream(Elaboratable):
 
         # MOSI data path
         m.d.comb += [
-            psource.width.eq(1),
-            psource.mask.eq(1),
+            psource.width.eq(self.bus_width),
+            psource.mask.eq(2**self.bus_width-1),
 
             psource.data.eq(dsink.data),
             psource.len.eq(len(dsink.data)),
