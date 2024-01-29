@@ -121,7 +121,7 @@ class StreamSimReceiver:
             e = expected[k]
             v = self.data[k]
             if len(e) != len(v):
-                raise AssertionError("Failed length differs: has: {}, expected: {}".format(len(v), len(e)))
+                raise AssertionError("Failed length differs for key '{}': has: {}, expected: {}".format(k, len(v), len(e)))
 
         for k in expected.keys():
             v = expected[k]

@@ -47,14 +47,31 @@ class SPIPHYSlave(Elaboratable):
         m = Module()
         m.submodules.fifo = fifo
 
+        # SPI x1
+        if hasattr(self.pins, "mosi"):
+            dq_o  = Signal()
+            dq_i  = Signal()
+            dq_oe = Signal() # Unused.
+            m.d.comb += self.pins.miso.eq(dq_o)
+            m.submodules += FFSynchronizer(self.pins.mosi, dq_i)
+
+        # SPI x2, x4, x8...
+        else:
+            dq_o  = Signal(len(self.pins.dq.o))
+            dq_i  = Signal(len(self.pins.dq.i))
+            dq_oe = Signal(len(self.pins.dq.oe)) # XXX not implemented
+            m.d.comb += [
+                self.pins.dq.o.eq(dq_o),
+                self.pins.dq.oe.eq(dq_oe),
+            ]
+            m.submodules += FFSynchronizer(self.pins.dq.i, dq_i)
+
         clk  = Signal()
         cs_n = Signal()
-        mosi = Signal()
 
         # Resynchronise input signals to sys clk
         m.submodules += FFSynchronizer(self.pins.clk,  clk)
         m.submodules += FFSynchronizer(self.pins.cs_n, cs_n)
-        m.submodules += FFSynchronizer(self.pins.mosi, mosi)
 
         clk_r = Signal()
         m.d.sync += clk_r.eq(clk)
@@ -95,8 +112,8 @@ class SPIPHYSlave(Elaboratable):
         # MOSI shift in
         with m.If(sample):
             m.d.sync += [
-                reg_in.eq(Cat(mosi, reg_in[:-1])),
-                cnt_in.eq(cnt_in + 1),
+                reg_in.eq(Cat(dq_i, reg_in)),
+                cnt_in.eq(cnt_in + len(dq_i)),
             ]
 
         # MOSI stream out
@@ -114,7 +131,8 @@ class SPIPHYSlave(Elaboratable):
         reg_out = Signal(self.width)
 
         # MISO stream in
-        with m.If(cnt_out == 0):
+        # XXX this seems bugged. shifted late
+        with m.If(en & (cnt_out == 0)):
             m.d.comb += sink.ready.eq(1)
             with m.If(sink.valid):
                 m.d.sync += [
@@ -125,11 +143,11 @@ class SPIPHYSlave(Elaboratable):
         # MISO shift out
         with m.Elif(update):
             m.d.sync += [
-                reg_out.eq(Cat(C(0, 1), reg_out[:-1])),
-                self.pins.miso.eq(reg_out[-1]),
+                reg_out.eq(Cat(C(0, len(dq_o)), reg_out)),
+                dq_o.eq(reg_out[-len(dq_o):]),
             ]
             with m.If(cnt_out > 0):
-                m.d.sync += cnt_out.eq(cnt_out - 1)
+                m.d.sync += cnt_out.eq(cnt_out - len(dq_o))
 
         with m.Elif(~en):
             m.d.sync += cnt_out.eq(0)

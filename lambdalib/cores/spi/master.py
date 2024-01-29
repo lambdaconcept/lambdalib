@@ -77,9 +77,9 @@ class LiteSPISDRPHYCore(Elaboratable):
                 dq_i[1].eq(pads.miso),
             ]
         else:
-            dq_o  = Signal(len(pads.dq))
-            dq_i  = Signal(len(pads.dq))
-            dq_oe = Signal(len(pads.dq))
+            dq_o  = Signal(len(pads.dq.o))
+            dq_i  = Signal(len(pads.dq.i))
+            dq_oe = Signal(len(pads.dq.oe))
             m.d.comb += [
                 pads.dq.o.eq(dq_o),
                 pads.dq.oe.eq(dq_oe),

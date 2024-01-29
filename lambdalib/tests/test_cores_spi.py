@@ -18,18 +18,34 @@ from ..interface.stream_sim import *
 
 
 class MasterSlaveBench(Elaboratable):
-    def __init__(self):
+    def __init__(self, bus_width=1):
         self.sys_clk_freq = 33.3333e6
-        self.spi_pins = SPIPinsStub()
-        self.master = SPIPHYMaster(self.spi_pins, self.sys_clk_freq,
+        self.pins_m = SPIPinsStub(bus_width=bus_width)
+        self.master = SPIPHYMaster(self.pins_m, self.sys_clk_freq,
                                    spi_clk_freq=5e6)
-        self.slave = SPIPHYSlave(self.spi_pins, width=16, stages=(16, 16, 16,))
+        self.pins_s = SPIPinsStub(bus_width=bus_width)
+        self.slave  = SPIPHYSlave(self.pins_s, width=16, stages=(16, 16, 16,))
 
     def elaborate(self, platform):
         m = Module()
 
         m.submodules.master = self.master
         m.submodules.slave  = self.slave
+        m.d.comb += [
+            self.pins_s.clk .eq(self.pins_m.clk),
+            self.pins_s.cs_n.eq(self.pins_m.cs_n),
+        ]
+
+        if hasattr(self.pins_m, "mosi"):
+            m.d.comb += [
+                self.pins_s.mosi.eq(self.pins_m.mosi),
+                self.pins_m.miso.eq(self.pins_s.miso),
+            ]
+        else:
+            with m.If(self.pins_m.dq.oe):
+                m.d.comb += self.pins_s.dq.i.eq(self.pins_m.dq.o)
+            with m.If(self.pins_s.dq.oe):
+                m.d.comb += self.pins_m.dq.i.eq(self.pins_s.dq.o)
 
         return m
 
@@ -83,8 +99,8 @@ class WbBridgeBench(SoC, Elaboratable):
         return m
 
 
-def test_spi():
-    top = MasterSlaveBench()
+def test_spi(bus_width=1):
+    top = MasterSlaveBench(bus_width=bus_width)
     sim = Simulator(top)
 
     def control():
@@ -95,9 +111,10 @@ def test_spi():
         yield top.master.cs.eq(0)
         yield
 
+    w = bus_width
     master_data = {
         "data": [0x0041, 0x0002,  0x0064, 0x0064],
-        "width": [    1,      1,       1,      1],
+        "width": [    w,      w,       w,      w],
         "mask":  [    1,      1,       1,      1],
         "len":   [   16,     16,      16,     16],
     }
@@ -123,8 +140,10 @@ def test_spi():
     sim.add_sync_process(slave_rx.sync_process)
     sim.add_sync_process(slave_tx.sync_process)
     sim.add_sync_process(control)
-    with sim.write_vcd("tests/test_spi.vcd"):
+    with sim.write_vcd(f"tests/test_spi_x{bus_width}.vcd"):
         sim.run()
+
+    slave_rx.verify({k:master_data[k] for k in ["data", "len"]})
 
 
 def test_spi_loop():
@@ -186,5 +205,6 @@ def test_spi_wb_bridge():
 
 if __name__ == "__main__":
     test_spi(); print()
+    test_spi(bus_width=4); print()
     # test_spi_wb_bridge(); print()
     test_spi_loop(); print()
