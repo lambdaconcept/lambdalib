@@ -9,22 +9,22 @@ from ...interface import stream
 __all__ = ["SPIStream"]
 
 
-spi_stream_layout = [
-    ("data", 8),
-]
+def spi_stream_layout(width):
+    return [("data", width)]
 
 
 class SPIStream(Elaboratable):
-    def __init__(self, bus_width=1):
+    def __init__(self, width=8, bus_width=1):
+        self.width = width
         self.bus_width = bus_width
 
         self.cs = Signal()
 
-        self.phy_sink    = stream.Endpoint(spi_phy2core_layout)
-        self.phy_source  = stream.Endpoint(spi_core2phy_layout)
+        self.phy_sink    = stream.Endpoint(spi_phy2core_layout(width))
+        self.phy_source  = stream.Endpoint(spi_core2phy_layout(width))
 
-        self.data_sink   = stream.Endpoint(spi_stream_layout)
-        self.data_source = stream.Endpoint(spi_stream_layout)
+        self.data_sink   = stream.Endpoint(spi_stream_layout(width))
+        self.data_source = stream.Endpoint(spi_stream_layout(width))
 
     def elaborate(self, platform):
         psink   = self.phy_sink
@@ -34,20 +34,21 @@ class SPIStream(Elaboratable):
 
         m = Module()
 
-        last = Signal()
         tx_en = Signal()
         rx_en = Signal()
 
         # MOSI data path
         m.d.comb += [
             psource.width.eq(self.bus_width),
-            psource.mask.eq(2**self.bus_width-1),
+            psource.oe.eq(1),
 
             psource.data.eq(dsink.data),
             psource.len.eq(len(dsink.data)),
 
             psource.valid.eq(dsink.valid & tx_en),
             dsink.ready.eq(psource.ready & tx_en),
+
+            psource.last.eq(dsink.last),
         ]
 
         # MISO data path
@@ -57,7 +58,7 @@ class SPIStream(Elaboratable):
             dsource.valid.eq(psink.valid & rx_en),
             psink.ready.eq(dsource.ready & rx_en),
 
-            dsource.last.eq(last),
+            dsource.last.eq(psink.last),
         ]
 
         with m.FSM():
@@ -84,10 +85,9 @@ class SPIStream(Elaboratable):
                     self.cs.eq(1),
 
                     rx_en.eq(1),
-                    last.eq(1),
                 ]
 
-                with m.If(psink.valid & psink.ready):
+                with m.If(psink.valid & psink.ready & psink.last):
                     m.next = "IDLE"
 
         return m
