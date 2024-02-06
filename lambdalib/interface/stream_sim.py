@@ -85,7 +85,8 @@ class StreamSimReceiver:
 
         i = 0
         while not i == self.length:
-            if (yield source.valid) and (random.random() < self.speed):
+            if ((yield source.valid) and (random.random() < self.speed)) \
+                    or self.speed == 1.0:
                 yield source.ready.eq(1)
             else:
                 yield source.ready.eq(0)

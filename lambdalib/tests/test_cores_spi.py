@@ -10,6 +10,7 @@ from lambdasoc.periph.timer import *
 from ..cores.spi.master import *
 from ..cores.spi.slave import *
 from ..cores.spi.bridge import *
+from ..cores.spi.stream import *
 from ..cores.spi.common import *
 
 
@@ -19,12 +20,12 @@ from ..interface.stream_sim import *
 
 class MasterSlaveBench(Elaboratable):
     def __init__(self, bus_width=1):
-        self.sys_clk_freq = 33.3333e6
+        self.sys_clk_freq = 100e6
         self.pins_m = SPIPinsStub(bus_width=bus_width)
         self.master = SPIPHYMaster(self.pins_m, self.sys_clk_freq,
-                                   spi_clk_freq=5e6)
+                                   spi_clk_freq=50e6, width=8)
         self.pins_s = SPIPinsStub(bus_width=bus_width)
-        self.slave  = SPIPHYSlave(self.pins_s, width=16, stages=(16, 16, 16,))
+        self.slave  = SPIPHYSlave(self.pins_s, width=8)
 
     def elaborate(self, platform):
         m = Module()
@@ -50,12 +51,42 @@ class MasterSlaveBench(Elaboratable):
         return m
 
 
+class MasterStreamBench(Elaboratable):
+    def __init__(self, bus_width=1):
+        self.sys_clk_freq = 100e6
+        self.api = SPIStream(width=8, bus_width=bus_width)
+        self.pins = SPIPinsStub(bus_width=bus_width)
+        self.master = SPIPHYMaster(self.pins, self.sys_clk_freq,
+                                   spi_clk_freq=50e6, width=8)
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.submodules.api = self.api
+        m.submodules.master = self.master
+
+        m.d.comb += [
+            self.master.cs.eq(self.api.cs),
+
+            self.api.phy_source.connect(self.master.sink),
+            self.master.source.connect(self.api.phy_sink),
+        ]
+
+        if hasattr(self.pins, "mosi"):
+            m.d.comb += self.pins.miso.eq(self.pins.mosi)
+        else:
+            with m.If(self.pins.dq.oe):
+                m.d.comb += self.pins.dq.i.eq(self.pins.dq.o)
+
+        return m
+
+
 class SlaveLoopBench(Elaboratable):
     def __init__(self):
         self.sys_clk_freq = 33.3333e6
         self.spi_pins = SPIPinsStub()
         self.master = SPIPHYMaster(self.spi_pins, self.sys_clk_freq,
-                                   spi_clk_freq=1e6)
+                                   spi_clk_freq=1e6, width=16)
         self.slave = SPIPHYSlave(self.spi_pins, width=16)
 
     def elaborate(self, platform):
@@ -115,18 +146,18 @@ def test_spi(bus_width=1):
     master_data = {
         "data": [0x0041, 0x0002,  0x0064, 0x0064],
         "width": [    w,      w,       w,      w],
-        "mask":  [    1,      1,       1,      1],
-        "len":   [   16,     16,      16,     16],
+        "oe":    [    1,      1,       1,      1],
+        "len":   [    8,      8,       8,      8],
     }
 
-    master_tx = StreamSimSender(top.master.sink, master_data, speed=0.5)
+    master_tx = StreamSimSender(top.master.sink, master_data, speed=1)
     master_rx = StreamSimReceiver(top.master.source,
                                  length=None,
-                                 speed=0.8, verbose=True, strname="master_rx")
+                                 speed=1, verbose=True, strname="master_rx")
 
     slave_data = {
         "data": [0xab, 0xcd, 0x98, 0x76],
-        "len":  [  16,   16,   16,   16],
+        "len":  [   8,    8,    8,    8],
     }
 
     slave_tx = StreamSimSender(top.slave.sink, slave_data, speed=0.8)
@@ -146,6 +177,29 @@ def test_spi(bus_width=1):
     slave_rx.verify({k:master_data[k] for k in ["data", "len"]})
 
 
+def test_spi_stream(bus_width=1):
+    top = MasterStreamBench(bus_width=bus_width)
+    sim = Simulator(top)
+
+    stream_data = {
+        "data": range(16),
+        "last": [0] * 15 + [1],
+    }
+
+    stream_tx = StreamSimSender(top.api.data_sink, stream_data, speed=1)
+    stream_rx = StreamSimReceiver(top.api.data_source,
+                                 length=len(stream_data["data"]),
+                                 speed=1, verbose=True, strname="stream_rx")
+
+    sim.add_clock(1e-6)
+    sim.add_sync_process(stream_tx.sync_process)
+    sim.add_sync_process(stream_rx.sync_process)
+    with sim.write_vcd(f"tests/test_spi_stream_x{bus_width}.vcd"):
+        sim.run()
+
+    stream_rx.verify(stream_data)
+
+
 def test_spi_loop():
     top = SlaveLoopBench()
     sim = Simulator(top)
@@ -161,7 +215,7 @@ def test_spi_loop():
     master_data = {
         "data": [0xa55a, 0x7ffe,  0xa55a, 0x7ffe],
         "width": [    1,      1,       1,      1],
-        "mask":  [    1,      1,       1,      1],
+        "oe":    [    1,      1,       1,      1],
         "len":   [   16,     16,      16,     16],
     }
 
@@ -206,5 +260,7 @@ def test_spi_wb_bridge():
 if __name__ == "__main__":
     test_spi(); print()
     test_spi(bus_width=4); print()
+    test_spi_stream(); print()
+    test_spi_stream(bus_width=4); print()
     # test_spi_wb_bridge(); print()
     test_spi_loop(); print()
