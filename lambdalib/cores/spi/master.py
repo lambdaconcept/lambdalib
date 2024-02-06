@@ -5,7 +5,7 @@
 # Copyright (c) 2021 Florent Kermarrec <florent@enjoy-digital.fr>
 # SPDX-License-Identifier: BSD-2-Clause
 
-# Translated from migen/litex to amaranth
+# Translated and rewritten from migen/litex to amaranth
 # https://github.com/litex-hub/litespi/blob/master/litespi/phy/generic_sdr.py
 
 import math
@@ -22,47 +22,55 @@ from ..time.timer import *
 __all__ = ["SPIPHYMaster"]
 
 
-def SPIPHYMaster(pins, sys_clk_freq, spi_clk_freq=10e6, spi_cs_delay=2):
-        # It seems that LiteSPISDRPHYCore does not support frequencies
-        # higher than sys_clk_freq / 4.
-        max_freq = sys_clk_freq // 4
+def SPIPHYMaster(pins, sys_clk_freq, width=8, spi_clk_freq=10e6, spi_cs_delay=2):
+        # LiteSPISDRPHYCore does not support frequencies higher than sys_clk_freq / 2.
+        max_freq = sys_clk_freq // 2
         if spi_clk_freq > max_freq:
             spi_clk_freq = max_freq
-            logging.warning("SPIPHYMaster clock frequency limited to: {} Hz".format(spi_clk_freq))
+            logging.warning("SPIPHYMaster clock frequency limited to: {:0.3f} MHz" \
+                    .format(spi_clk_freq / 1e6))
         div = math.ceil((sys_clk_freq / spi_clk_freq / 2) - 1)
         cs_delay = math.ceil(spi_cs_delay * sys_clk_freq / spi_clk_freq)
-        return LiteSPISDRPHYCore(pins, default_divisor=div, cs_delay=cs_delay)
+
+        real_freq = sys_clk_freq / 2 / (div + 1)
+        logging.warning("SPIPHYMaster clock frequency set to {:0.3f} MHz" \
+                .format(real_freq / 1e6))
+        return _LiteSPISDRPHYCore(pins, width=width, divisor=div, cs_delay=cs_delay)
 
 
-# LiteSPI PHY Core ---------------------------------------------------------------------------------
+class _LiteSPISDRPHYCore(Elaboratable):
+    def __init__(self, pads, width=8, divisor=1, cs_delay=0):
+        # assert(divisor >= 1)
+        self.pads = pads
+        self.width = width
+        self.divisor = divisor
+        self.cs_delay = cs_delay
 
-class LiteSPISDRPHYCore(Elaboratable):
-    def __init__(self, pads, default_divisor, cs_delay):
-        assert(default_divisor >= 1)
-        self.pads             = pads
-        self.cs_delay         = cs_delay
-        self.source           = stream.Endpoint(spi_phy2core_layout)
-        self.sink             = stream.Endpoint(spi_core2phy_layout)
-        self.cs               = Signal()
-        self.spi_clk_divisor  = Signal(8, reset=default_divisor)
+        self.cs = Signal()
+        self.sink = stream.Endpoint(spi_core2phy_layout(width))
+        self.source = stream.Endpoint(spi_phy2core_layout(width))
 
     def elaborate(self, platform):
         sink = self.sink
-        source = self.source
         pads = self.pads
 
         m = Module()
 
+        m.submodules.fifo = fifo = stream.SyncFIFO(self.source.description, 8,
+                                                   buffered=True)
+        m.d.comb += fifo.source.connect(self.source)
+
         # Clock Generator.
         m.submodules.clkgen = clkgen = LiteSPIClkGen(pads, with_ddr=False)
         m.d.comb += [
-            clkgen.div.eq(self.spi_clk_divisor),
+            clkgen.div.eq(self.divisor),
             clkgen.sample_cnt.eq(1),
             clkgen.update_cnt.eq(1),
         ]
 
         # CS control.
-        m.submodules.cs_timer = cs_timer = WaitTimer(self.cs_delay + 1) # Ensure cs_delay cycles between XFers.
+        # Ensure cs_delay cycles between XFers.
+        m.submodules.cs_timer = cs_timer = WaitTimer(self.cs_delay + 1)
         cs_enable = Signal()
         m.d.comb += cs_timer.wait.eq(self.cs)
         m.d.comb += cs_enable.eq(cs_timer.done)
@@ -92,87 +100,99 @@ class LiteSPISDRPHYCore(Elaboratable):
             m.d.comb += pads.wp_n.eq(1)
 
         # Data Shift Registers.
-        sr_cnt       = Signal(8, reset_less=True)
+        sr_out_cnt   = Signal(8, reset_less=True)
         sr_out_load  = Signal()
         sr_out_shift = Signal()
         sr_out       = Signal(len(sink.data), reset_less=True)
+        sr_out_end   = Signal()
+
+        sr_in_cnt    = Signal(8, reset_less=True)
+        sr_in_load   = Signal()
         sr_in_shift  = Signal()
         sr_in        = Signal(len(sink.data), reset_less=True)
+        sr_in_end    = Signal()
+
+        width_r      = Signal.like(sink.width)
+        last_r       = Signal()
 
         # Data Out Generation/Load/Shift.
-        m.d.comb += dq_oe.eq(sink.mask)
-        with m.Switch(sink.width):
+        with m.Switch(width_r):
             for i in [1, 2, 4, 8]:
                 with m.Case(i):
                     m.d.comb += dq_o.eq(sr_out[-i:])
 
         with m.If(sr_out_load):
-            m.d.sync += sr_out.eq(sink.data << (len(sink.data) - sink.len).as_unsigned())
+            m.d.sync += [
+                sr_out .eq(sink.data << (len(sink.data) - sink.len).as_unsigned()),
+                width_r.eq(sink.width),
+                dq_oe  .eq(sink.oe),
+                last_r .eq(sink.last),
+            ]
+            m.d.comb += sink.ready.eq(1)
 
-        with m.If(sr_out_shift):
-            with m.Switch(sink.width):
+        with m.Elif(sr_out_shift):
+            with m.Switch(width_r):
                 for i in [1, 2, 4, 8]:
                     with m.Case(i):
                         m.d.sync += sr_out.eq(Cat(Signal(i), sr_out))
 
         # Data In Shift.
         with m.If(sr_in_shift):
-            with m.Switch(sink.width):
+            with m.Switch(width_r):
                 with m.Case(1):
                     m.d.sync += sr_in.eq(Cat(dq_i[1], sr_in))
                 for i in [2, 4, 8]:
                     with m.Case(i):
                         m.d.sync += sr_in.eq(Cat(dq_i[:i], sr_in))
-        m.d.comb += source.data.eq(sr_in)
 
-        # FSM.
-        with m.FSM(reset="WAIT-CMD-DATA"):
-            with m.State("WAIT-CMD-DATA"):
-                # Wait for CS and a CMD from the Core.
-                with m.If(cs_enable & sink.valid):
-                    # Load Shift Register Count/Data Out.
-                    m.d.sync += sr_cnt.eq(sink.len - sink.width)
-                    m.d.comb += sr_out_load.eq(1)
-                    # Start XFER.
-                    m.next = "XFER"
+        with m.If(sr_in_end):
+            m.d.sync += fifo.sink.valid.eq(1) # FIFO ready is checked beforehand
+            m.d.sync += fifo.sink.last.eq(last_r)
+        with m.Else():
+            m.d.sync += fifo.sink.valid.eq(0)
 
-            with m.State("XFER"):
-                # Generate Clk.
-                m.d.comb += clkgen.en.eq(1),
+        m.d.comb += fifo.sink.data.eq(sr_in)
 
-                # Data In Shift.
-                with m.If(clkgen.posedge_reg2):
-                    m.d.comb += sr_in_shift.eq(1)
+        xfr_en = Signal()
+        running = Signal()
+        m.d.comb += xfr_en.eq(cs_enable & sink.valid & fifo.sink.ready)
 
-                # Data Out Shift.
-                with m.If(clkgen.negedge):
-                    m.d.comb += sr_out_shift.eq(1)
+        # Generate Clk.
+        m.d.comb += clkgen.en.eq(running)
 
-                # Shift Register Count Update/Check.
-                with m.If(clkgen.negedge):
-                    m.d.sync += sr_cnt.eq(sr_cnt - sink.width)
-                    # End XFer.
-                    with m.If(sr_cnt == 0):
-                        m.next = "XFER-END"
+        # Wait for Start Condition.
+        with m.If((~running | sr_out_end) & xfr_en):
+            m.d.sync += running.eq(1)
 
-            with m.State("XFER-END"):
-                # Last data already captured in XFER when divisor > 0
-                # so only capture for divisor == 0.
-                with m.If((self.spi_clk_divisor > 0) | clkgen.posedge_reg2):
-                    # Accept CMD.
-                    m.d.comb += sink.ready.eq(1),
-                    # Capture last data (only for spi_clk_divisor == 0).
-                    m.d.comb += sr_in_shift.eq(self.spi_clk_divisor == 0),
-                    # Send Status/Data to Core.
-                    m.next = "SEND-STATUS-DATA"
+            # Load Shift Register Count/Data Out.
+            m.d.comb += sr_out_load.eq(1)
+            m.d.sync += sr_out_cnt.eq(sink.len - sink.width)
 
-            with m.State("SEND-STATUS-DATA"):
-                # Send Data In to Core and return to WAIT when accepted.
-                m.d.comb += [
-                    source.valid.eq(1),
-                    source.last.eq(1),
-                ]
-                with m.If(source.ready):
-                    m.next = "WAIT-CMD-DATA"
+            m.d.sync += sr_in_load.eq(1)
+            m.d.sync += sr_in_cnt.eq(sink.len - sink.width)
+
+        # Stop transmission.
+        with m.Elif(sr_out_end & ~xfr_en):
+            m.d.sync += running.eq(0)
+
+        # Data In Shift.
+        with m.If(clkgen.posedge_reg):
+            m.d.comb += sr_in_shift.eq(1)
+
+            # End XFer.
+            with m.If(sr_in_cnt == 0):
+                m.d.comb += sr_in_end.eq(1)
+            with m.Else():
+                m.d.sync += sr_in_cnt.eq(sr_in_cnt - width_r)
+
+        # Data Out Shift.
+        with m.If(clkgen.negedge):
+            m.d.comb += sr_out_shift.eq(1)
+
+            # End XFer.
+            with m.If(sr_out_cnt == 0):
+                m.d.comb += sr_out_end.eq(1)
+            with m.Else():
+                m.d.sync += sr_out_cnt.eq(sr_out_cnt - width_r)
 
         return m

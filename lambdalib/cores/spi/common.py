@@ -4,16 +4,23 @@ from amaranth import *
 from amaranth.hdl.rec import *
 
 
-spi_core2phy_layout = [
-    ("data", 32), # XXX make this a parameter
-    ("len",   6),
-    ("width", 4),
-    ("mask",  8), # XXX oe always len 1
-]
+def spi_core2phy_layout(width, with_len=True):
+    layout = [
+        ("data",  width),
+        ("width", range(8 + 1)),    # Supports up to octo spi
+        ("oe",    1),
+    ]
+    if with_len:
+        layout += [("len", range(width + 1))]
+    return layout
 
-spi_phy2core_layout = [
-    ("data", 32),
-]
+def spi_phy2core_layout(width, with_len=True):
+    layout = [
+        ("data",  width),
+    ]
+    if with_len:
+        layout += [("len", range(width + 1))]
+    return layout
 
 def spi_slave_layout(width, with_len=True):
     layout = [("data", width)]
