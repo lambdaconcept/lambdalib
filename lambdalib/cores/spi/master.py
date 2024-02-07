@@ -154,8 +154,15 @@ class _LiteSPISDRPHYCore(Elaboratable):
         m.d.comb += fifo.sink.data.eq(sr_in)
 
         xfr_en = Signal()
+        fifo_full = Signal()
         running = Signal()
-        m.d.comb += xfr_en.eq(cs_enable & sink.valid & fifo.sink.ready)
+
+        m.d.comb += [
+            # FIFO needs at least 1 free slot  for divisor > 1
+            #                     2 free slots for divisor == 1.
+            fifo_full.eq(fifo.level > (fifo.depth-2)),
+            xfr_en.eq(cs_enable & sink.valid & ~fifo_full),
+        ]
 
         # Generate Clk.
         m.d.comb += clkgen.en.eq(running)
