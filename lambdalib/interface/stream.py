@@ -349,3 +349,45 @@ class Converter(Elaboratable):
 
     def elaborate(self, platform):
         return self.converter
+
+
+class ConverterCDC(Elaboratable):
+    def __init__(self, nbits_from, nbits_to, cd_from="sync", cd_to="sync",
+                 reverse=False, buffered=True):
+        self.nbits_from = nbits_from
+        self.nbits_to = nbits_to
+        self.cd_from = cd_from
+        self.cd_to = cd_to
+        self.reverse = reverse
+        self.buffered = buffered
+
+        self.sink = Endpoint([("data", nbits_from)])
+        self.source = Endpoint([("data", nbits_to)])
+
+    def elaborate(self, platform):
+        sin = self.sink
+
+        m = Module()
+
+        # Need width converter ?
+        if self.nbits_from != self.nbits_to:
+            m.submodules.cvt = cvt = DomainRenamer(self.cd_from)(
+                Converter(self.nbits_from, self.nbits_to, reverse=self.reverse)
+            )
+
+            m.d.comb += sin.connect(cvt.sink)
+            sin = cvt.source
+
+        # Need cross domain clocking ?
+        if self.cd_from != self.cd_to:
+            m.submodules.asc = asc = AsyncFIFO(
+                sin.description, 8, buffered=self.buffered,
+                w_domain=self.cd_from, r_domain=self.cd_to,
+            )
+
+            m.d.comb += sin.connect(asc.sink)
+            sin = asc.source
+
+        m.d.comb += sin.connect(self.source)
+
+        return m
