@@ -14,7 +14,7 @@ def spi_core2phy_layout(width, with_len=True):
         layout += [("len", range(width + 1))]
     return layout
 
-def spi_phy2core_layout(width, with_len=True):
+def spi_phy2core_layout(width, with_len=False):
     layout = [
         ("data",  width),
     ]
