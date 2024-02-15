@@ -8,7 +8,7 @@ authors = [
 ]
 dependencies = [
     "setuptools>=69.0.2",
-    
+    "amaranth@git+https://github.com/amaranth-lang/amaranth"
     "amaranth@git+https://github.com/amaranth-lang/amaranth-stdio",
 
 ]
