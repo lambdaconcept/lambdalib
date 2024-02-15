@@ -340,7 +340,7 @@ def _get_converter_ratio(nbits_from, nbits_to):
 
 # Translated from migen/litex to amaranth
 # https://github.com/enjoy-digital/litex/blob/master/litex/soc/interconnect/stream.py
-class Converter(Elaboratable):
+class _Converter(Elaboratable):
     def __init__(self, nbits_from, nbits_to, reverse=False):
         cls, ratio = _get_converter_ratio(nbits_from, nbits_to)
         self.converter = cls(nbits_from, nbits_to, ratio, reverse)
@@ -351,7 +351,7 @@ class Converter(Elaboratable):
         return self.converter
 
 
-class ConverterCDC(Elaboratable):
+class Converter(Elaboratable):
     def __init__(self, nbits_from, nbits_to, cd_from="sync", cd_to="sync",
                  reverse=False, buffered=True):
         self.nbits_from = nbits_from
@@ -372,7 +372,7 @@ class ConverterCDC(Elaboratable):
         # Need width converter ?
         if self.nbits_from != self.nbits_to:
             m.submodules.cvt = cvt = DomainRenamer(self.cd_from)(
-                Converter(self.nbits_from, self.nbits_to, reverse=self.reverse)
+                _Converter(self.nbits_from, self.nbits_to, reverse=self.reverse)
             )
 
             m.d.comb += sin.connect(cvt.sink)
