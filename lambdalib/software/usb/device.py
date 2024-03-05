@@ -69,17 +69,24 @@ class USBEndpoint():
 class USBDevice():
     INTERFACE   = 0
 
-    def __init__(self, bulksize, pid=0x1234, vid=0xffff):
+    def __init__(self, bulksize, pid=0x1234, vid=0xffff, idx=0):
         self.bulksize = bulksize
         self.pid = pid
         self.vid = vid
 
+        self.handle = None
         self.context = usb1.USBContext()
-        self.handle = self.context.openByVendorIDAndProductID(
-            self.vid,
-            self.pid,
-            skip_on_error=True,
-        )
+
+        index = 0
+        for device in self.context.getDeviceList(skip_on_error=True):
+            if device.getVendorID()  == vid and \
+               device.getProductID() == pid:
+
+                if index == idx:
+                    self.handle = device.open()
+                    break
+                index += 1
+
         if self.handle is None:
             raise usb1.USBError("Device not present, check udev rules")
         self.handle.claimInterface(self.INTERFACE)
