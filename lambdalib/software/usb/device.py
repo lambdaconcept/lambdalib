@@ -25,7 +25,8 @@ class USBEndpoint():
 
     def cb_rd(self, xfr):
         # print("cb rd", xfr.getStatus())
-        self.rdata = xfr.getBuffer()
+        length = xfr.getActualLength()
+        self.rdata = xfr.getBuffer()[0:length]
         self.rbusy = False
 
     def send(self, data):
