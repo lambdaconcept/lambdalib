@@ -7,7 +7,11 @@ authors = [
     {name = "Pierre-Olivier Vauboin", email = "po@lambdaconcept.com"},
 ]
 dependencies = [
-    "luna @ git+https://github.com/greatscottgadgets/luna.git"
+    "luna @ git+https://github.com/greatscottgadgets/luna.git",
+    "setuptools",
+    "minerva @ https://github.com/minerva-cpu/minerva.git",
+    "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git"
+    
 ]
 requires-python = ">=3.10"
 readme = "README.md"
