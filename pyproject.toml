@@ -9,7 +9,7 @@ authors = [
 dependencies = [
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
-    "minerva @ https://github.com/minerva-cpu/minerva.git",
+    "minerva @ git+https://github.com/minerva-cpu/minerva.git",
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git"
     
 ]
