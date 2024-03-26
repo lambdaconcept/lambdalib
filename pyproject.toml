@@ -8,6 +8,7 @@ authors = [
 ]
 dependencies = [
     "amaranth[builtin-yosys]~=0.4.0",
+    "yowasp-nextpnr-ice40",
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
