@@ -14,7 +14,7 @@ dependencies = [
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git",
     #"amaranth_stdio @ git+https://github.com/key2/amaranth-stdio.git"
-    "amaranth-stdio"
+    "amaranth_stdio @ amaranth-stdio"
 
 ]
 
