@@ -10,9 +10,10 @@ dependencies = [
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
-    "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git"
-    
+    "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git",
+    "amaranth_stdio @ git+https://github.com/amaranth-lang/amaranth-stdio.git"
 ]
+
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
