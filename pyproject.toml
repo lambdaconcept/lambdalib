@@ -7,6 +7,7 @@ authors = [
     {name = "Pierre-Olivier Vauboin", email = "po@lambdaconcept.com"},
 ]
 dependencies = [
+    "amaranth[builtin-yosys]=~0.4.0",
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
@@ -22,6 +23,8 @@ license = {text = "MIT"}
 "Source Code" = "https://github.com/lambdaconcept/lambdalib"
 "Bug Tracker" = "https://github.com/lambdaconcept/lambdalib/issues"
 
+[tool.pdm.scripts]
+_.env_file = ".env.toolchain"
 
 [build-system]
 requires = ["wheel", "setuptools>=67.0", "setuptools_scm[toml]>=6.2"]
