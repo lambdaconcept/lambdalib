@@ -8,14 +8,12 @@ authors = [
 ]
 dependencies = [
     "amaranth[builtin-yosys]~=0.4.0",
+    "amaranth_stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
     "yowasp-nextpnr-ecp5",
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git",
-    "amaranth_stdio @ git+https://github.com/key2/amaranth-stdio.git"
-
-
 ]
 
 requires-python = ">=3.10"
