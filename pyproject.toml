@@ -7,7 +7,7 @@ authors = [
     {name = "Pierre-Olivier Vauboin", email = "po@lambdaconcept.com"},
 ]
 dependencies = [
-    "amaranth[builtin-yosys]=~0.4.0",
+    "amaranth[builtin-yosys]~=0.4.0",
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "setuptools",
     "minerva @ git+https://github.com/minerva-cpu/minerva.git",
