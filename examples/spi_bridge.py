@@ -63,8 +63,8 @@ class SPIMasterBridge(Elaboratable):
                 max_led += 1
         leds = [platform.request('rgb_led', i) for i in range(max_led)]
         m.d.comb += [
-            leds[0].r.eq(link.rx_activity),
-            leds[1].r.eq(link.tx_activity),
+            leds[0].r.o.eq(link.rx_activity),
+            leds[1].r.o.eq(link.tx_activity),
         ]
 
         return m
@@ -109,8 +109,8 @@ class SPISlaveBridge(Elaboratable):
                 max_led += 1
         leds = [platform.request('rgb_led', i) for i in range(max_led)]
         m.d.comb += [
-            leds[0].r.eq(link.rx_activity),
-            leds[1].r.eq(link.tx_activity),
+            leds[0].r.o.eq(link.rx_activity),
+            leds[1].r.o.eq(link.tx_activity),
         ]
 
         return m

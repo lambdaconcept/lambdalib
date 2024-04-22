@@ -65,8 +65,8 @@ class Top(Elaboratable):
                 max_led += 1
         leds = [platform.request('rgb_led', i) for i in range(max_led)]
         m.d.comb += [
-            leds[0].r.eq(link.source.valid & link.source.ready),
-            leds[1].r.eq(link.sink.valid & link.sink.ready),
+            leds[0].r.o.eq(link.source.valid & link.source.ready),
+            leds[1].r.o.eq(link.sink.valid & link.sink.ready),
         ]
 
         return m
