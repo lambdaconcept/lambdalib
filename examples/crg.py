@@ -6,8 +6,8 @@ from amaranth import *
 from amaranth.lib.cdc import ResetSynchronizer
 
 from luna.gateware.architecture.car import PHYResetController
-from lambdasoc.cores.pll.xilinx_7series import PLL_Xilinx7Series
-from lambdasoc.cores.pll.lattice_ecp5 import PLL_LatticeECP5
+from lambdalib.cores.pll.xilinx_7series import PLL_Xilinx7Series
+from lambdalib.cores.pll.lattice_ecp5 import PLL_LatticeECP5
 
 
 __all__ = [
