@@ -1,35 +1,18 @@
 [project]
 name = "lambdalib"
 version = "0.1.0"
-description = "Lambdalib library of different core and toold for amaranth"
+description = "Lambdalib is a collection of lib/tools for amaranth-hdl"
 authors = [
-    {name = "PO Vauboin", email = "po@lambdaconcept.com"},
     {name = "Pierre-Olivier Vauboin", email = "po@lambdaconcept.com"},
 ]
 dependencies = [
-    "amaranth[builtin-yosys]~=0.4.0",
-    "amaranth_stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
-    "yowasp-nextpnr-ecp5",
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
-    "setuptools",
-    "minerva @ git+https://github.com/minerva-cpu/minerva.git",
-    "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc.git",
+    "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
 ]
-
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 readme = "README.md"
 license = {text = "MIT"}
 
-[project.urls]
-"Source Code" = "https://github.com/lambdaconcept/lambdalib"
-"Bug Tracker" = "https://github.com/lambdaconcept/lambdalib/issues"
-
-[tool.pdm.scripts]
-_.env_file = ".env.toolchain"
-
 [build-system]
-requires = ["wheel", "setuptools>=67.0", "setuptools_scm[toml]>=6.2"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools_scm]
-local_scheme = "node-and-timestamp"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
