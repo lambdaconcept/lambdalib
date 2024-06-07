@@ -8,6 +8,7 @@ authors = [
 dependencies = [
     "luna @ git+https://github.com/greatscottgadgets/luna.git",
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
+    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
 ]
 requires-python = ">=3.8"
 readme = "README.md"
@@ -16,3 +17,5 @@ license = {text = "MIT"}
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
+
+[tool.pdm]
