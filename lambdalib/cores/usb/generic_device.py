@@ -26,6 +26,8 @@ class USBGenericDevice(Elaboratable):
             i_product="Generic Bulk",
             i_serial="",
             ep_pairs=1,
+            ep_sizes=None,
+            max_packet_size=None,
             **kwargs):
 
         self.pins = pins
@@ -36,7 +38,20 @@ class USBGenericDevice(Elaboratable):
         self.i_product      = i_product
         self.i_serial       = i_serial
 
+        if max_packet_size is None:
+            self.max_packet_size = self.BULK_PACKET_SIZE_FS if hasattr(pins, "d_n") \
+                              else self.BULK_PACKET_SIZE_HS
+        else:
+            self.max_packet_size = max_packet_size
+
+        if ep_sizes is None:
+            ep_sizes = [(self.max_packet_size, self.max_packet_size)
+                            for k in range(ep_pairs)]
+        else:
+            ep_pairs = len(ep_sizes)
+
         self.ep_pairs = ep_pairs
+        self.ep_sizes = ep_sizes
 
         self.kwargs = kwargs
 
@@ -52,9 +67,6 @@ class USBGenericDevice(Elaboratable):
             for i in range(self.ep_pairs):
                 setattr(self, "sink_"   + str(i), self.sinks[i])
                 setattr(self, "source_" + str(i), self.sources[i])
-
-        self.max_packet_size = self.BULK_PACKET_SIZE_FS if hasattr(pins, "d_n") \
-                          else self.BULK_PACKET_SIZE_HS
 
         self.tx_activity = Signal(self.ep_pairs)
         self.rx_activity = Signal(self.ep_pairs)
@@ -79,14 +91,16 @@ class USBGenericDevice(Elaboratable):
             with c.InterfaceDescriptor() as i:
                 i.bInterfaceNumber = 0
 
-                for k in range(self.ep_pairs):
-                    with i.EndpointDescriptor() as e:
-                        e.bEndpointAddress = self.BULK_ENDPOINT_NUMBER + k
-                        e.wMaxPacketSize   = self.max_packet_size
+                for k, (imax, omax) in enumerate(self.ep_sizes):
+                    if omax != 0:
+                        with i.EndpointDescriptor() as e:
+                            e.bEndpointAddress = self.BULK_ENDPOINT_NUMBER + k
+                            e.wMaxPacketSize   = omax
 
-                    with i.EndpointDescriptor() as e:
-                        e.bEndpointAddress = 0x80 | (self.BULK_ENDPOINT_NUMBER + k)
-                        e.wMaxPacketSize   = self.max_packet_size
+                    if imax != 0:
+                        with i.EndpointDescriptor() as e:
+                            e.bEndpointAddress = 0x80 | (self.BULK_ENDPOINT_NUMBER + k)
+                            e.wMaxPacketSize   = imax
 
         return descriptors
 
@@ -99,22 +113,24 @@ class USBGenericDevice(Elaboratable):
         descriptors = self.create_descriptors()
         usb.add_standard_control_endpoint(descriptors)
 
-        for k in range(self.ep_pairs):
-            # Add a stream endpoint to our device.
-            stream_out_ep = USBAsyncStreamOutEndpoint(
-                endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
-                max_packet_size=self.max_packet_size,
-            )
-            usb.add_endpoint(stream_out_ep)
-            m.d.comb += stream_out_ep.source.connect(self.sources[k])
+        for k, (i, o) in enumerate(self.ep_sizes):
+            # Add a stream OUT endpoint to our device.
+            if o != 0:
+                stream_out_ep = USBAsyncStreamOutEndpoint(
+                    endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
+                    max_packet_size=o,
+                )
+                usb.add_endpoint(stream_out_ep)
+                m.d.comb += stream_out_ep.source.connect(self.sources[k])
 
-            # Add a stream endpoint to our device.
-            stream_in_ep = USBAsyncStreamInEndpoint(
-                endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
-                max_packet_size=self.max_packet_size,
-            )
-            usb.add_endpoint(stream_in_ep)
-            m.d.comb += self.sinks[k].connect(stream_in_ep.sink)
+            # Add a stream IN endpoint to our device.
+            if i != 0:
+                stream_in_ep = USBAsyncStreamInEndpoint(
+                    endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
+                    max_packet_size=i,
+                )
+                usb.add_endpoint(stream_in_ep)
+                m.d.comb += self.sinks[k].connect(stream_in_ep.sink)
 
         m.d.comb += usb.connect.eq(1)
 
