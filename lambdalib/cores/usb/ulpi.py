@@ -12,10 +12,11 @@ __all__ = ["DirectULPI"]
 
 
 class DirectULPI(Elaboratable):
-    def __init__(self, pins, rx_depth=32, tx_depth=32):
+    def __init__(self, pins, sys_clk_freq, rx_depth=32, tx_depth=32):
         self.sink   = stream.Endpoint([("data", 8)])
         self.source = stream.Endpoint([("data", 8)])
 
+        self.sys_clk_freq = sys_clk_freq
         self.rx_depth = rx_depth
         self.tx_depth = tx_depth
         self._pins = pins
@@ -26,7 +27,8 @@ class DirectULPI(Elaboratable):
         m.domains += ClockDomain("ulpi", local=True)
 
         m.submodules.xcvr     = xcvr     = _Transceiver(domain="ulpi", pins=self._pins)
-        m.submodules.timer    = timer    = _Timer()
+        m.submodules.por      = por      = _POR(self.sys_clk_freq)
+        m.submodules.timer    = timer    = _Timer(60e6, domain="ulpi")
         m.submodules.splitter = splitter = _Splitter()
         m.submodules.sender   = sender   = _Sender()
 
@@ -44,15 +46,9 @@ class DirectULPI(Elaboratable):
         ]
 
         with m.FSM(domain="ulpi"):
-            with m.State("RESET-0"):
-                m.d.comb += xcvr.rst.eq(1)
-                m.d.comb += timer.cnt2us.eq(1)
-                with m.If(timer.done):
-                    m.next = "RESET-1"
-
-            with m.State("RESET-1"):
-                m.d.comb += timer.cnt4ms.eq(1)
-                with m.If(timer.done):
+            with m.State("RESET"):
+                m.d.comb += xcvr.rst.eq(por.rst)
+                with m.If(por.done):
                     m.next = "INIT-0"
 
             with m.State("INIT-0"):
@@ -176,11 +172,48 @@ class _Transceiver(Elaboratable):
         return m
 
 
+class _POR(Elaboratable):
+    def __init__(self, sys_clk_freq):
+        self.sys_clk_freq = sys_clk_freq
+
+        self.rst  = Signal()
+        self.done = Signal()
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # The timer counter must run in the sync clock domain which is sure
+        # to be available at all times. The ulpi clock domain (ulpi clkout)
+        # may be stopped during reset depending on the ulpi phy chip.
+        m.submodules.timer = timer = _Timer(self.sys_clk_freq, domain="sync")
+
+        with m.FSM():
+            with m.State("RESET"):
+                m.d.comb += self.rst.eq(1)
+                m.d.comb += timer.cnt2us.eq(1)
+                with m.If(timer.done):
+                    m.next = "WAIT"
+
+            with m.State("WAIT"):
+                m.d.comb += timer.cnt4ms.eq(1)
+                with m.If(timer.done):
+                    m.next = "IDLE"
+
+            with m.State("IDLE"):
+                m.d.comb += self.done.eq(1)
+
+        return m
+
+
 class _Timer(Elaboratable):
-    def __init__(self):
+    def __init__(self, sys_clk_freq, domain="sync"):
+        self.sys_clk_freq = sys_clk_freq
+
         self.cnt2us = Signal()
         self.cnt4ms = Signal()
         self.done   = Signal()
+
+        self._domain = domain
 
     def elaborate(self, platform):
         m = Module()
@@ -189,15 +222,15 @@ class _Timer(Elaboratable):
 
         with m.If(self.cnt2us | self.cnt4ms):
             with m.If(self.done):
-                m.d.ulpi += counter.eq(0)
+                m.d[self._domain] += counter.eq(0)
             with m.Else():
-                m.d.ulpi += counter.eq(counter + 1)
+                m.d[self._domain] += counter.eq(counter + 1)
         with m.Else():
-            m.d.ulpi += counter.eq(0)
+            m.d[self._domain] += counter.eq(0)
 
-        with m.If(self.cnt2us & (counter == int(60e6 * 2e-6))):
+        with m.If(self.cnt2us & (counter == int(self.sys_clk_freq * 2e-6))):
             m.d.comb += self.done.eq(1)
-        with m.If(self.cnt4ms & (counter == int(60e6 * 4e-3))):
+        with m.If(self.cnt4ms & (counter == int(self.sys_clk_freq * 4e-3))):
             m.d.comb += self.done.eq(1)
 
         return m
