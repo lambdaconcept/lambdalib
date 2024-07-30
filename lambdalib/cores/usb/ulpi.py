@@ -4,11 +4,73 @@
 
 from amaranth import *
 from amaranth.hdl.rec import *
+from amaranth.lib.cdc import ResetSynchronizer
+
 
 from ...interface import stream
 
 
-__all__ = ["DirectULPI"]
+__all__ = ["DirectULPI", "DumpULPIRegs"]
+
+
+class DumpULPIRegs(Elaboratable):
+    def __init__(self, pins, sys_clk_freq, max_addr=0x3f):
+        self.sys_clk_freq = sys_clk_freq
+        self.max_addr = max_addr
+        self._pins = pins
+
+        self.source = stream.Endpoint([("data", 8)])
+
+    def elaborate(self, platform):
+        source = self.source
+
+        m = Module()
+
+        m.domains += ClockDomain("ulpi") # XXX local
+        m.submodules += ResetSynchronizer(ResetSignal("sync"), domain="ulpi")
+
+        m.submodules.xcvr = xcvr = _Transceiver(domain="ulpi", pins=self._pins)
+        m.submodules.por  = por  = _POR(self.sys_clk_freq)
+
+        addr = Signal(6)
+
+        with m.FSM(domain="ulpi"):
+            with m.State("RESET"):
+                m.d.comb += xcvr.rst.eq(por.rst)
+                with m.If(por.done):
+                    m.next = "READ-CMD"
+
+            with m.State("READ-CMD"):
+                # Write TXD CMD Register Read
+                m.d.comb += [
+                    xcvr.sink.data.eq(0xc0 | addr),
+                    xcvr.sink.valid.eq(1)
+                ]
+                with m.If(xcvr.sink.ready):
+                    m.next = "READ-VAL"
+
+            with m.State("READ-VAL"):
+                # Read Register Value
+                m.d.ulpi += source.data.eq(xcvr.source.data)
+                with m.If(xcvr.source.valid):
+                    m.next = "OUT-VAL"
+
+            with m.State("OUT-VAL"):
+                m.d.comb += source.valid.eq(1)
+                with m.If(source.ready):
+                    m.next = "ADDR-INC"
+
+            with m.State("ADDR-INC"):
+                with m.If(addr == self.max_addr):
+                    m.next = "DONE"
+                with m.Else():
+                    m.d.ulpi += addr.eq(addr + 1)
+                    m.next = "READ-CMD"
+
+            with m.State("DONE"):
+                pass
+
+        return m
 
 
 class DirectULPI(Elaboratable):
