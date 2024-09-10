@@ -67,12 +67,11 @@ class USBEndpoint():
 
 
 class USBDevice():
-    INTERFACE   = 0
-
-    def __init__(self, bulksize, pid=0x1234, vid=0xffff, idx=0):
+    def __init__(self, bulksize, pid=0x1234, vid=0xffff, idx=0, interface=0):
         self.bulksize = bulksize
         self.pid = pid
         self.vid = vid
+        self.interface = interface
 
         self.handle = None
         self.context = usb1.USBContext()
@@ -89,7 +88,7 @@ class USBDevice():
 
         if self.handle is None:
             raise usb1.USBError("Device not present, check udev rules")
-        self.handle.claimInterface(self.INTERFACE)
+        self.handle.claimInterface(self.interface)
 
     def get_endpoint(self, num, asynchronous=True):
         return USBEndpoint(self.handle, self.bulksize, num,
@@ -97,5 +96,5 @@ class USBDevice():
 
     def __del__(self):
         if self.handle:
-            self.handle.releaseInterface(self.INTERFACE)
+            self.handle.releaseInterface(self.interface)
         self.context.close()
