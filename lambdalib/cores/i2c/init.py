@@ -17,6 +17,7 @@ class I2CRegisterInit(Elaboratable):
         self.regs_data = regs_data
         self.i2c_freq = i2c_freq
         self.i2c_pins = i2c_pins
+        self.done = Signal()  # Asserted when init sequence has been sent
 
     def regs_data_to_mem(self, regs_data):
         mem = []
@@ -38,5 +39,7 @@ class I2CRegisterInit(Elaboratable):
         m.submodules.writer = writer = I2CWriterStream(self.i2c_pins, i2c_period)
 
         m.d.comb += mem.source.connect(writer.sink)
+        with m.If(mem.source.valid & mem.source.ready & mem.source.last):
+            m.d.sync += self.done.eq(1)
 
         return m
