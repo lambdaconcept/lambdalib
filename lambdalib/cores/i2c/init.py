@@ -50,7 +50,7 @@ class I2CRegisterInit(Elaboratable):
         with m.If(mem.source.valid & mem.source.ready & mem.source.last):
             m.d.sync += self.done.eq(1)
 
-        if expose_writer is None:
+        if self.writer is None:
             m.d.comb += mem.source.connect(writer.sink)
         else:
             with m.If(~self.done):
@@ -60,7 +60,7 @@ class I2CRegisterInit(Elaboratable):
                 ]
             with m.Else():
                 m.d.comb += [
-                    self.writer.connect(writer.sink)
+                    self.writer.connect(writer.sink),
                     mem.source.ready.eq(0),
                 ]
 
