@@ -90,6 +90,12 @@ class USBDevice():
             raise usb1.USBError("Device not present, check udev rules")
         self.handle.claimInterface(self.interface)
 
+    def control_write(self, *args):
+        self.handle.controlWrite(*args)
+
+    def control_read(self, *args):
+        return self.handle.controlRead(*args)
+
     def get_endpoint(self, num, asynchronous=True):
         return USBEndpoint(self.handle, self.bulksize, num,
                            asynchronous=asynchronous, context=self.context)

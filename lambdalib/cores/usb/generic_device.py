@@ -52,6 +52,7 @@ class USBGenericDevice(Elaboratable):
 
         self.ep_pairs = ep_pairs
         self.ep_sizes = ep_sizes
+        self.control_ep_handlers = []
 
         self.kwargs = kwargs
 
@@ -104,6 +105,9 @@ class USBGenericDevice(Elaboratable):
 
         return descriptors
 
+    def add_control_ep_handler(self, handler):
+        self.control_ep_handlers.append(handler)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -111,7 +115,11 @@ class USBGenericDevice(Elaboratable):
 
         # Add our standard control endpoint to the device.
         descriptors = self.create_descriptors()
-        usb.add_standard_control_endpoint(descriptors)
+        control_ep = usb.add_standard_control_endpoint(descriptors)
+
+        # Add optional custom requests handlers (vendor)
+        for handler in self.control_ep_handlers:
+            control_ep.add_request_handler(handler)
 
         for k, (i, o) in enumerate(self.ep_sizes):
             # Add a stream OUT endpoint to our device.
