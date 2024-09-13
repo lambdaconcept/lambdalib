@@ -103,7 +103,7 @@ def test_i2c_proto():
         sim.run()
 
 
-def test_i2c_reg_stream():
+def test_i2c_reg_stream_8bit():
     dut = I2CRegStream(0x2C, 8, 8)
     sim = Simulator(dut)
 
@@ -130,7 +130,44 @@ def test_i2c_reg_stream():
     sim.add_clock(1e-6)
     sim.add_sync_process(sender.sync_process)
     sim.add_sync_process(receiver.sync_process)
-    with sim.write_vcd("tests/test_i2c_reg_command_generator.vcd"):
+    with sim.write_vcd("tests/test_i2c_reg_stream_8bit.vcd"):
+        sim.run()
+
+    assert receiver.data["data"] == out_stream
+
+
+def test_i2c_reg_stream_16bit():
+    dut = I2CRegStream(0x2C, 16, 16)
+    sim = Simulator(dut)
+
+    datas = {
+        "addr": [0xABCD, 0xEF01],
+        "val": [0x5A10, 0xA5BF],
+    }
+
+    out_stream = [
+        0x2C << 1,
+        0xAB,
+        0xCD,
+        0x5A,
+        0x10,
+
+        0x2C << 1,
+        0xEF,
+        0x01,
+        0xA5,
+        0xBF,
+    ]
+
+    sender = StreamSimSender(dut.sink, datas, speed=0.9,
+                             verbose=True, strname="sender")
+    receiver = StreamSimReceiver(dut.source, length=len(out_stream), speed=1,
+                                 verbose=True, strname="receiver")
+
+    sim.add_clock(1e-6)
+    sim.add_sync_process(sender.sync_process)
+    sim.add_sync_process(receiver.sync_process)
+    with sim.write_vcd("tests/test_i2c_reg_stream_16bit.vcd"):
         sim.run()
 
     assert receiver.data["data"] == out_stream
@@ -140,4 +177,5 @@ if __name__ == "__main__":
     test_i2c_stream_writer()
     test_i2c_stream()
     test_i2c_proto()
-    test_i2c_reg_stream()
+    test_i2c_reg_stream_8bit()
+    test_i2c_reg_stream_16bit()
