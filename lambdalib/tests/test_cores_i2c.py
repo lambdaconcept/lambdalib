@@ -3,11 +3,11 @@
 from amaranth import *
 from amaranth.lib.io import Pin
 
-from ..cores.i2c.stream import *
-from ..cores.i2c.proto import *
+from lambdalib.cores.i2c.stream import *
+from lambdalib.cores.i2c.proto import *
 
 from amaranth.sim import *
-from ..interface.stream_sim import *
+from lambdalib.interface.stream_sim import *
 
 
 class I2C_Pins_Stub:
@@ -104,6 +104,6 @@ def test_i2c_proto():
 
 
 if __name__ == "__main__":
-    # test_i2c_stream_writer()
-    # test_i2c_stream()
+    test_i2c_stream_writer()
+    test_i2c_stream()
     test_i2c_proto()

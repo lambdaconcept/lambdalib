@@ -3,8 +3,8 @@
 from amaranth import *
 from amaranth.sim import *
 
-from ..interface.stream_sim import *
-from ..interface.stream_utils import *
+from lambdalib.interface.stream_sim import *
+from lambdalib.interface.stream_utils import *
 
 
 def test_splitter():
