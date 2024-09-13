@@ -9,6 +9,7 @@ from .i2c import *
 __all__ = [
     "I2CStream",
     "I2CWriterStream",
+    "I2CRegStream",
     "i2c_writer_description",
 ]
 
@@ -223,6 +224,68 @@ class I2CWriterStream(Elaboratable):
 
             with m.State("_WAIT_STOP"):
                 with m.If(~i2c.busy):
+                    m.next = "IDLE"
+
+        return m
+
+
+class I2CRegStream(Elaboratable):
+    """Converts addr/val stream into an I2C stream.
+    Currently only supports 8bit reg addresses and values."""
+    def __init__(self, i2c_addr, addr_width=8, val_width=8):
+        assert addr_width == 8
+        assert val_width == 8
+
+        self._i2c_addr = i2c_addr
+        self._addr_width = addr_width
+        self._val_width = val_width
+
+        self.sink = stream.Endpoint([
+            ("addr", addr_width),
+            ("val", val_width)
+        ])
+        self.source = stream.Endpoint([
+            ("data", 8),
+        ])
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Latch addr/val
+        addr_d = Signal(self._addr_width)
+        val_d = Signal(self._val_width)
+
+        with m.FSM():
+            with m.State("IDLE"):
+                m.d.comb += self.sink.ready.eq(1)
+                with m.If(self.sink.valid):
+                    m.d.sync += [
+                        self.source.valid.eq(1),
+                        self.source.data.eq(self._i2c_addr << 1),
+                        addr_d.eq(self.sink.addr),
+                        val_d.eq(self.sink.val),
+                    ]
+                    m.next = "PUSH-SLAVE-ADDR"
+            
+            with m.State("PUSH-SLAVE-ADDR"):
+                with m.If(self.source.ready):
+                    m.d.sync += self.source.data.eq(addr_d)
+                    m.next = "PUSH-REG-ADDR"
+
+            with m.State("PUSH-REG-ADDR"):
+                with m.If(self.source.ready):
+                    m.d.sync += [
+                        self.source.data.eq(val_d),
+                        self.source.last.eq(1),
+                    ]
+                    m.next = "PUSH-REG-VAL"
+
+            with m.State("PUSH-REG-VAL"):
+                with m.If(self.source.ready):
+                    m.d.sync += [
+                        self.source.valid.eq(0),
+                        self.source.last.eq(0),
+                    ]
                     m.next = "IDLE"
 
         return m
