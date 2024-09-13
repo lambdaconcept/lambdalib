@@ -230,11 +230,12 @@ class I2CWriterStream(Elaboratable):
 
 
 class I2CRegStream(Elaboratable):
-    """Converts addr/val stream into an I2C stream.
-    Currently only supports 8bit reg addresses and values."""
+    """Converts addr/val stream into an I2C stream."""
     def __init__(self, i2c_addr, addr_width=8, val_width=8):
-        assert addr_width == 8
-        assert val_width == 8
+        if addr_width % 8 != 0 and addr_width > 0:
+            raise ValueError("addr_width must be a multiple of 8 bits")
+        if val_width % 8 != 0 and val_width > 0:
+            raise ValueError("val_width must be a multiple of 8 bits")
 
         self._i2c_addr = i2c_addr
         self._addr_width = addr_width
@@ -252,8 +253,9 @@ class I2CRegStream(Elaboratable):
         m = Module()
 
         # Latch addr/val
-        addr_d = Signal(self._addr_width)
-        val_d = Signal(self._val_width)
+        addr_latch = Signal(self._addr_width)
+        val_latch = Signal(self._val_width)
+        byte_pos = Signal(range(max(self._addr_width // 8, self._val_width // 8)))
 
         with m.FSM():
             with m.State("IDLE"):
@@ -262,30 +264,49 @@ class I2CRegStream(Elaboratable):
                     m.d.sync += [
                         self.source.valid.eq(1),
                         self.source.data.eq(self._i2c_addr << 1),
-                        addr_d.eq(self.sink.addr),
-                        val_d.eq(self.sink.val),
+                        addr_latch.eq(self.sink.addr),
+                        val_latch.eq(self.sink.val),
+                        byte_pos.eq(self._addr_width // 8 - 1),
                     ]
                     m.next = "PUSH-SLAVE-ADDR"
             
             with m.State("PUSH-SLAVE-ADDR"):
                 with m.If(self.source.ready):
-                    m.d.sync += self.source.data.eq(addr_d)
+                    m.d.sync += [
+                        self.source.data.eq(addr_latch.word_select(byte_pos.as_unsigned(), 8)),
+                    ]
                     m.next = "PUSH-REG-ADDR"
 
             with m.State("PUSH-REG-ADDR"):
                 with m.If(self.source.ready):
-                    m.d.sync += [
-                        self.source.data.eq(val_d),
-                        self.source.last.eq(1),
-                    ]
-                    m.next = "PUSH-REG-VAL"
+                    with m.If(byte_pos > 0):
+                        m.d.sync += [
+                            self.source.data.eq(addr_latch.word_select((byte_pos - 1).as_unsigned(), 8)),
+                            byte_pos.eq(byte_pos - 1),
+                        ]
+                    with m.Else():
+                        m.d.sync += [
+                            self.source.data.eq(val_latch[-8:]),
+                            byte_pos.eq(self._val_width // 8 - 1),
+                        ]
+                        if self._val_width == 8:
+                            m.d.sync += self.source.last.eq(1)
+                        m.next = "PUSH-REG-VAL"
 
             with m.State("PUSH-REG-VAL"):
                 with m.If(self.source.ready):
-                    m.d.sync += [
-                        self.source.valid.eq(0),
-                        self.source.last.eq(0),
-                    ]
-                    m.next = "IDLE"
+                    with m.If(byte_pos == 0):
+                        m.d.sync += [
+                            self.source.valid.eq(0),
+                            self.source.last.eq(0),
+                        ]
+                        m.next = "IDLE"
+                    with m.Else():
+                        m.d.sync += [
+                            self.source.data.eq(val_latch.word_select((byte_pos - 1).as_unsigned(), 8)),
+                            byte_pos.eq(byte_pos - 1),
+                        ]
+                        with m.If(byte_pos == 1):
+                            m.d.sync += self.source.last.eq(1)
 
         return m
