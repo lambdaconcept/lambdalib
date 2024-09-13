@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = [
     "luna-usb @ git+https://github.com/greatscottgadgets/luna.git",
-    "amaranth @ git+https://github.com/amaranth-lang/amaranth@4d1c4fc20dc44398c09d334b7f34096b0185d43d",
+    "amaranth @ git+https://github.com/amaranth-lang/amaranth@v0.4.5",
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
     "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
     "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc@d66881d83419c689fc96168150e57d9f467723aa",
