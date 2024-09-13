@@ -7,15 +7,15 @@ from amaranth_soc import wishbone
 from lambdasoc.soc.base import SoC
 from lambdasoc.periph.timer import *
 
-from ..cores.spi.master import *
-from ..cores.spi.slave import *
-from ..cores.spi.bridge import *
-from ..cores.spi.stream import *
-from ..cores.spi.common import *
+from lambdalib.cores.spi.master import *
+from lambdalib.cores.spi.slave import *
+from lambdalib.cores.spi.bridge import *
+from lambdalib.cores.spi.stream import *
+from lambdalib.cores.spi.common import *
 
 
 from amaranth.sim import *
-from ..interface.stream_sim import *
+from lambdalib.interface.stream_sim import *
 
 
 class MasterSlaveBench(Elaboratable):
