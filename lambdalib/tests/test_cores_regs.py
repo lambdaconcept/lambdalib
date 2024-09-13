@@ -3,8 +3,8 @@
 from amaranth import *
 from amaranth.sim import *
 
-from ..interface.stream_sim import *
-from ..cores.regs import *
+from lambdalib.interface.stream_sim import *
+from lambdalib.cores.regs import *
 
 
 def test_regs():
