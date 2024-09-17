@@ -8,7 +8,9 @@ from lambdalib.interface import stream
 
 
 __all__ = [
+    "USBSyncStreamOutEndpoint",
     "USBAsyncStreamOutEndpoint",
+    "USBSyncStreamInEndpoint",
     "USBAsyncStreamInEndpoint",
     "usb_ep_description",
 ]
@@ -17,6 +19,26 @@ __all__ = [
 usb_ep_description = [
     ("data", 8),
 ]
+
+
+class USBSyncStreamOutEndpoint(USBStreamOutEndpoint):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Wrap the luna endpoint with our stream interface
+        self.source = stream.Endpoint(usb_ep_description)
+
+    def elaborate(self, platform):
+        m = super().elaborate(platform)
+
+        m.d.comb += [
+            self.source.data.eq(self.stream.payload),
+            self.source.valid.eq(self.stream.valid),
+            self.source.last.eq(self.stream.last),
+            self.stream.ready.eq(self.source.ready),
+        ]
+
+        return m
 
 
 class USBAsyncStreamOutEndpoint(USBStreamOutEndpoint):
@@ -42,6 +64,26 @@ class USBAsyncStreamOutEndpoint(USBStreamOutEndpoint):
             cdc_out.sink.valid.eq(self.stream.valid),
             cdc_out.sink.last.eq(self.stream.last),
             self.stream.ready.eq(cdc_out.sink.ready),
+        ]
+
+        return m
+
+
+class USBSyncStreamInEndpoint(USBStreamInEndpoint):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Wrap the luna endpoint with our stream interface
+        self.sink = stream.Endpoint(usb_ep_description)
+
+    def elaborate(self, platform):
+        m = super().elaborate(platform)
+
+        m.d.comb += [
+            self.stream.payload.eq(self.sink.data),
+            self.stream.valid.eq(self.sink.valid),
+            self.stream.last.eq(self.sink.last),
+            self.sink.ready.eq(self.stream.ready),
         ]
 
         return m

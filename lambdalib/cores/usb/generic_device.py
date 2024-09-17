@@ -28,6 +28,7 @@ class USBGenericDevice(Elaboratable):
             ep_pairs=1,
             ep_sizes=None,
             max_packet_size=None,
+            with_cdc=True,
             **kwargs):
 
         self.pins = pins
@@ -53,6 +54,7 @@ class USBGenericDevice(Elaboratable):
         self.ep_pairs = ep_pairs
         self.ep_sizes = ep_sizes
         self.control_ep_handlers = []
+        self.with_cdc = with_cdc
 
         self.kwargs = kwargs
 
@@ -121,10 +123,18 @@ class USBGenericDevice(Elaboratable):
         for handler in self.control_ep_handlers:
             control_ep.add_request_handler(handler)
 
+        # Instanciate or not cross domain endpoints
+        if self.with_cdc:
+            ep_o_cls = USBAsyncStreamOutEndpoint
+            ep_i_cls = USBAsyncStreamInEndpoint
+        else:
+            ep_o_cls = USBSyncStreamOutEndpoint
+            ep_i_cls = USBSyncStreamInEndpoint
+
         for k, (i, o) in enumerate(self.ep_sizes):
             # Add a stream OUT endpoint to our device.
             if o != 0:
-                stream_out_ep = USBAsyncStreamOutEndpoint(
+                stream_out_ep = ep_o_cls(
                     endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
                     max_packet_size=o,
                 )
@@ -133,7 +143,7 @@ class USBGenericDevice(Elaboratable):
 
             # Add a stream IN endpoint to our device.
             if i != 0:
-                stream_in_ep = USBAsyncStreamInEndpoint(
+                stream_in_ep = ep_i_cls(
                     endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
                     max_packet_size=i,
                 )
