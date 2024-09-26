@@ -3,7 +3,11 @@
 from amaranth import *
 
 from usb_protocol.emitters import DeviceDescriptorCollection
+from usb_protocol.emitters.descriptors.standard import get_string_descriptor
+from usb_protocol.emitters.descriptors.microsoft10 import MicrosoftOS10DescriptorCollection
+from usb_protocol.types.descriptors.microsoft10 import RegistryTypes
 from luna.usb2 import USBDevice, USBStreamOutEndpoint, USBStreamInEndpoint
+from luna.gateware.usb.request.windows import MicrosoftOS10RequestHandler
 
 from .endpoint_cdc import *
 from lambdalib.interface import stream
@@ -29,6 +33,7 @@ class USBGenericDevice(Elaboratable):
             ep_sizes=None,
             max_packet_size=None,
             with_cdc=True,
+            with_microsoft_os_1_0=False,
             **kwargs):
 
         self.pins = pins
@@ -55,6 +60,7 @@ class USBGenericDevice(Elaboratable):
         self.ep_sizes = ep_sizes
         self.control_ep_handlers = []
         self.with_cdc = with_cdc
+        self.with_microsoft_os_1_0 = with_microsoft_os_1_0
 
         self.kwargs = kwargs
 
@@ -107,6 +113,28 @@ class USBGenericDevice(Elaboratable):
 
         return descriptors
 
+    def add_microsoft_os_1_0(self, descriptors):
+        """ Add Microsoft OS 1.0 descriptors for Windows compatibility. """
+
+        descriptors.add_descriptor(get_string_descriptor("MSFT100\xee"), index=0xee)
+
+        msft_descriptors = MicrosoftOS10DescriptorCollection()
+
+        with msft_descriptors.ExtendedCompatIDDescriptor() as c:
+            with c.Function() as f:
+                f.bFirstInterfaceNumber = 0
+                f.compatibleID          = "WINUSB"
+
+        with msft_descriptors.ExtendedPropertiesDescriptor() as d:
+            with d.Property() as p:
+                # Windows defined ClassGUID for "USBDevice"
+                p.dwPropertyDataType = RegistryTypes.REG_SZ
+                p.PropertyName       = "DeviceInterfaceGUID"
+                p.PropertyData       = "{88bae032-5a81-49f0-bc3d-a4ff138216d6}"
+
+        msft_handler = MicrosoftOS10RequestHandler(msft_descriptors, request_code=0xee)
+        self.add_control_ep_handler(msft_handler)
+
     def add_control_ep_handler(self, handler):
         self.control_ep_handlers.append(handler)
 
@@ -117,7 +145,17 @@ class USBGenericDevice(Elaboratable):
 
         # Add our standard control endpoint to the device.
         descriptors = self.create_descriptors()
-        control_ep = usb.add_standard_control_endpoint(descriptors)
+
+        # Optionally add handlers for Microsoft descriptors.
+        if self.with_microsoft_os_1_0:
+            self.add_microsoft_os_1_0(descriptors)
+
+        control_ep = usb.add_standard_control_endpoint(
+            descriptors,
+            # Windows compatible descriptors cannot be build in block ram
+            # because MSFT string at index 0xee is not contiguous.
+            avoid_blockram=self.with_microsoft_os_1_0,
+        )
 
         # Add optional custom requests handlers (vendor)
         for handler in self.control_ep_handlers:
