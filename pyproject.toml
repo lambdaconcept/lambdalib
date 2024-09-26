@@ -8,7 +8,7 @@ authors = [
 dependencies = [
     # Needed because of pending PR:
     # https://github.com/greatscottgadgets/luna/pull/277
-    "luna-usb @ git+https://github.com/lambdaconcept/luna.git@jeanthom/fs-limitation-utmi",
+    "luna-usb @ git+https://github.com/lambdaconcept/luna.git",
     "amaranth >= 0.4, < 0.5",
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
     "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
