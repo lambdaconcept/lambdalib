@@ -167,7 +167,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--platform", choices=("ecpix"),
+    parser.add_argument("--platform", choices=(["ecpix"]),
                         default="ecpix",
                         help="platform variant (default: %(default)s)")
     parser.add_argument("--width", choices=("1", "2", "4", "8"),
