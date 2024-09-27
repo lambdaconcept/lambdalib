@@ -120,10 +120,17 @@ class USBGenericDevice(Elaboratable):
 
         msft_descriptors = MicrosoftOS10DescriptorCollection()
 
-        with msft_descriptors.ExtendedCompatIDDescriptor() as c:
-            with c.Function() as f:
-                f.bFirstInterfaceNumber = 0
-                f.compatibleID          = "WINUSB"
+        # When not passed explicitely as an interface list, consider
+        # just the first interface number 0 as Windows compatible.
+        if isinstance(self.with_microsoft_os_1_0, bool):
+            self.with_microsoft_os_1_0 = [0]
+
+        for intf in self.with_microsoft_os_1_0:
+            # Declare all interfaces from the list as Windows compatible
+            with msft_descriptors.ExtendedCompatIDDescriptor() as c:
+                with c.Function() as f:
+                    f.bFirstInterfaceNumber = intf
+                    f.compatibleID          = "WINUSB"
 
         with msft_descriptors.ExtendedPropertiesDescriptor() as d:
             with d.Property() as p:
