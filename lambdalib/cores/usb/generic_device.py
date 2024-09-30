@@ -33,7 +33,8 @@ class USBGenericDevice(Elaboratable):
             ep_sizes=None,
             max_packet_size=None,
             with_cdc=True,
-            with_microsoft_os_1_0=False,
+            with_microsoft_os_1_0=False,        # Set to True for interface 0,
+                                                # or pass a list() of interfaces
             force_contiguous_blockram=False,
             **kwargs):
 
@@ -137,9 +138,9 @@ class USBGenericDevice(Elaboratable):
         if isinstance(self.with_microsoft_os_1_0, bool):
             self.with_microsoft_os_1_0 = [0]
 
-        for intf in self.with_microsoft_os_1_0:
+        with msft_descriptors.ExtendedCompatIDDescriptor() as c:
             # Declare all interfaces from the list as Windows compatible
-            with msft_descriptors.ExtendedCompatIDDescriptor() as c:
+            for intf in self.with_microsoft_os_1_0:
                 with c.Function() as f:
                     f.bFirstInterfaceNumber = intf
                     f.compatibleID          = "WINUSB"
