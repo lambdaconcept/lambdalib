@@ -353,41 +353,61 @@ class _Converter(Elaboratable):
 
 class Converter(Elaboratable):
     def __init__(self, nbits_from, nbits_to, cd_from="sync", cd_to="sync",
-                 reverse=False, buffered=True):
+                 reverse=False, buffered=True,
+                 put_width_converter_first=True):
         self.nbits_from = nbits_from
         self.nbits_to = nbits_to
         self.cd_from = cd_from
         self.cd_to = cd_to
         self.reverse = reverse
         self.buffered = buffered
+        self.put_width_converter_first = put_width_converter_first
 
         self.sink = Endpoint([("data", nbits_from)])
         self.source = Endpoint([("data", nbits_to)])
 
-    def elaborate(self, platform):
-        sin = self.sink
-
-        m = Module()
-
+    def put_width_converter(self, m, s):
         # Need width converter ?
         if self.nbits_from != self.nbits_to:
             m.submodules.cvt = cvt = DomainRenamer(self.cd_from)(
                 _Converter(self.nbits_from, self.nbits_to, reverse=self.reverse)
             )
 
-            m.d.comb += sin.connect(cvt.sink)
-            sin = cvt.source
+            m.d.comb += s.connect(cvt.sink)
+            return cvt.source
 
+        return s
+
+    def put_cross_domain(self, m, s):
         # Need cross domain clocking ?
         if self.cd_from != self.cd_to:
             m.submodules.asc = asc = AsyncFIFO(
-                sin.description, 8, buffered=self.buffered,
+                s.description, 8, buffered=self.buffered,
                 w_domain=self.cd_from, r_domain=self.cd_to,
             )
 
-            m.d.comb += sin.connect(asc.sink)
-            sin = asc.source
+            m.d.comb += s.connect(asc.sink)
+            return asc.source
 
-        m.d.comb += sin.connect(self.source)
+        return s
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # Depending on the design we give the choice to change the
+        # conversion order. This has an importance:
+        # - Cross domain FIFO is gate costly, we might want to put
+        #   it on the smallest width side to save gates.
+        # - But clock frequencies are important too:
+        #   we might want to perform the width conversion in the fastest
+        #   clock domain to preserve the overall data throughput.
+        s = self.sink
+        if self.put_width_converter_first:
+            s = self.put_width_converter(m, s)
+            s = self.put_cross_domain(m, s)
+        else:
+            s = self.put_cross_domain(m, s)
+            s = self.put_width_converter(m, s)
+        m.d.comb += s.connect(self.source)
 
         return m
