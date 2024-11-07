@@ -7,13 +7,15 @@ __all__ = ["USBDevice"]
 
 
 class USBEndpoint():
-    def __init__(self, handle, size, num, asynchronous=True, context=None, timeout=1000):
+    def __init__(self, handle, size, num, asynchronous=True, context=None,
+                 timeout=1000, device=None):
         self.handle = handle
         self.size = size
         self.num = num
         self.asynchronous = asynchronous
         self.context = context
         self.timeout = timeout
+        self.device = device
 
         # function alias
         self.write = self.send
@@ -98,7 +100,8 @@ class USBDevice():
 
     def get_endpoint(self, num, asynchronous=True):
         return USBEndpoint(self.handle, self.bulksize, num,
-                           asynchronous=asynchronous, context=self.context)
+                           asynchronous=asynchronous, context=self.context,
+                           device=self)
 
     def __del__(self):
         if self.handle:
