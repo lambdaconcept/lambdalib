@@ -15,6 +15,39 @@ STATUS_OK   = 0
 STATUS_ERR  = 1
 
 class I2CProto(Elaboratable):
+    """ Protocol oriented wrapper around the bidirectional I2CStream.
+
+    The main use of this module is for creating a I2C bridge from software,
+    typically over UART or USB.
+
+    Sink stream description:
+        `data`: header
+            header[0]: 1 == read
+                       0 == write
+        `data`: length
+            amount of data bytes to read or write
+
+    When writing:
+        -> `sink.data`
+            header
+        -> `sink.data`
+            length
+        -> `sink.data` ... `sink.data`
+            data write ...  data write
+        <- `source.data`
+            status
+
+    When reading:
+        -> `sink.data`
+            header
+        -> `sink.data`
+            length
+        <- `source.data`
+            status
+        <- `source.data` ... `source.data`
+            data read    ...  data read
+
+    """
     def __init__(self,
                  sys_clk_freq,
                  i2c_freq=400e3,

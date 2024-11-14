@@ -27,6 +27,82 @@ i2c_stage_dw = range(I2CStage.DATA_REG + 1)
 
 
 class I2CStream(Elaboratable):
+    """ Bidirectional stream wrapper for I2C.
+
+    Sink stream description:
+        `r_wn`: 1 == read 8 bits on SDA
+                0 == write 8 bits on SDA
+        `data`: for write: data to write on SDA
+                for read: N/A
+        `last`: 1 to indicate this is the last I2C transfer,
+                I2C stop will be sent at the end of this transaction.
+
+    Source stream description:
+        `data`: for read: 8 bits read from SDA
+                for write: N/A
+        `last`: for read: indicate this was the last data read
+                before the end of the I2C transaction.
+
+    Example of use: I2C 8bit address register write
+    ===============================================
+
+        Step 1: Write I2C chip address
+            r_wn == 0
+            data == I2C chip address << 1
+            last == 0
+
+        Step 2: Write register address
+            r_wn == 0
+            data == register address
+            last == 0
+
+        Step 3: Write register values
+            r_wn == 0
+            data == 1st register value
+            last == 0
+
+            [...]
+
+            r_wn == 0
+            data == nth register value
+            last == 1   <--- I2C STOP
+
+    Example of use: I2C 8bit address register read
+    ==============================================
+
+        Step 1: Write I2C chip address
+            r_wn == 0
+            data == I2C chip address << 1
+            last == 0
+
+        Step 2: Write register address
+            r_wn == 0
+            data == register address
+            last == 1   <--- I2C STOP
+
+        Step 3: Write I2C chip address
+            r_wn == 0
+            data == (I2C chip address << 1) | 1
+            last == 0
+
+        Step 4: Read register values
+            sink.r_wn == 1
+            sink.data == N/A
+            sink.last == 0
+
+            source.data == 1st register value
+            source.last == 0
+
+            [...]
+
+            sink.r_wn == 1
+            sink.data == N/A
+            sink.last == 1   <--- I2C STOP
+
+            source.data == nth register value
+            source.last == 1
+    """
+
     def __init__(self, pins, period_cyc, **kwargs):
         self.pins = pins
         self.period_cyc = period_cyc
@@ -132,6 +208,20 @@ class I2CStream(Elaboratable):
 
 
 class I2CWriterStream(Elaboratable):
+    """ Write only stream wrapper around I2CInitiator.
+
+    Important note:
+        This module is intented to be used only
+        when I2C transactions always have the same 3 steps format:
+            1. I2C chip address
+            2. register address
+            3. register value
+
+        The `sink.last` signal is not used and I2C transaction is
+        always stopped on the 3rd step after writing one register value.
+
+        As such, this module cannot be used to write a burst of registers.
+    """
     def __init__(self, pins, period_cyc, **kwargs):
         self.pins = pins
         self.period_cyc = period_cyc
