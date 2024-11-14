@@ -75,6 +75,7 @@ class I2CBus:
     def discover(self):
         print("Discovering...")
 
+        addrs = []
         for addr in range(0, 128): # 7 bits addr
 
             length = 0
@@ -87,12 +88,15 @@ class I2CBus:
                 sys.stdout.write(".. ")
                 sys.stdout.flush()
             else:
+                addrs.append(addr)
                 sys.stdout.write(f"{addr:02x} ")
                 sys.stdout.flush()
 
             if (addr % 16) == 15:
                 sys.stdout.write("\n")
                 sys.stdout.flush()
+
+        return addrs
 
     def discover_queue(self):
         print("Discovering...")
