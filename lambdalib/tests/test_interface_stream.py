@@ -3,6 +3,7 @@
 from amaranth import *
 from amaranth.sim import *
 
+from lambdalib.interface import stream
 from lambdalib.interface.stream_sim import *
 from lambdalib.interface.stream_utils import *
 
@@ -94,6 +95,29 @@ def test_merger():
         sim.run()
 
 
+def test_last_inserter():
+    inserter = LastInserter(3)(stream.Converter(8, 8))
+    sim = Simulator(inserter)
+
+    data = {
+        "data": range(20),
+        "last": [0]*19 + [1],
+    }
+
+    length = len(data["data"])
+    sender = StreamSimSender(inserter.sink, data, speed=0.5)
+    receiver = StreamSimReceiver(inserter.source,
+                                 length=length,
+                                 speed=0.8, verbose=True)
+
+    sim.add_clock(1e-6)
+    sim.add_sync_process(sender.sync_process)
+    sim.add_sync_process(receiver.sync_process)
+    with sim.write_vcd("tests/test_stream_last_inserter.vcd"):
+        sim.run()
+
+
 if __name__ == "__main__":
     test_splitter(); print()
     test_merger(); print()
+    test_last_inserter(); print()
