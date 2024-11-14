@@ -128,6 +128,7 @@ class MemoryStreamReader(Elaboratable):
         self.init = init
         self.buffered = buffered
 
+        self.done = Signal()
         self.rewind = Signal()
         self.source = stream.Endpoint([("data", dw)], name="source_mem_o")
 
@@ -152,7 +153,6 @@ class MemoryStreamReader(Elaboratable):
         m.submodules.mem_rp = mem_rp = mem.read_port(transparent=False)
 
         wait = Signal(reset=1)
-        done = Signal()
 
         addr_rd = Signal.like(mem_rp.addr)
         addr_nxt = Signal.like(mem_rp.addr)
@@ -161,7 +161,7 @@ class MemoryStreamReader(Elaboratable):
 
         # Rewind the memory to the beginning
         with m.If(self.rewind):
-            m.d.sync += done.eq(0)
+            m.d.sync += self.done.eq(0)
             m.d.sync += addr_rd.eq(0)
             m.d.comb += addr_nxt.eq(0)
 
@@ -173,7 +173,7 @@ class MemoryStreamReader(Elaboratable):
             m.d.sync += addr_rd.eq(addr_nxt)
 
             with m.If(last):
-                m.d.sync += done.eq(1)
+                m.d.sync += self.done.eq(1)
 
         with m.Else():
             m.d.comb += addr_nxt.eq(addr_rd)
@@ -182,7 +182,7 @@ class MemoryStreamReader(Elaboratable):
         m.d.comb += [
             mem_rp.addr.eq(addr_nxt),
             mem_rp.en.eq(1),
-            source.valid.eq(~self.rewind & ~wait & ~done),
+            source.valid.eq(~self.rewind & ~wait & ~self.done),
             source.data.eq(mem_rp.data),
             source.last.eq(last),
         ]
