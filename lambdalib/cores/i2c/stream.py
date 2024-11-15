@@ -10,10 +10,15 @@ __all__ = [
     "I2CStream",
     "I2CWriterStream",
     "I2CRegStream",
+    "i2c_stream_description",
     "i2c_writer_description",
 ]
 
 
+i2c_stream_description = [
+    ("r_wn", 1),
+    ("data", 8),
+]
 i2c_writer_description = [
     ("data", 8),
 ]
@@ -108,11 +113,8 @@ class I2CStream(Elaboratable):
         self.period_cyc = period_cyc
         self.kwargs = kwargs
 
-        self.error = Signal()
-        self.sink = stream.Endpoint([
-            ("r_wn", 1),
-            ("data", 8),
-        ])
+        self.error  = Signal()
+        self.sink   = stream.Endpoint(i2c_stream_description)
         self.source = stream.Endpoint([
             ("data", 8),
         ])

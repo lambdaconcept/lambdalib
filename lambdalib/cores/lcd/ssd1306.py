@@ -5,6 +5,7 @@ from amaranth import *
 from ...interface import stream
 from ...interface.stream_utils import *
 from ..mem.stream import *
+from ..i2c.stream import *
 
 
 __all__ = ["SSD1306"]
@@ -43,10 +44,7 @@ class SSD1306_Wrapper(Elaboratable):
             ("d_cn", 1),
             ("data", 8),
         ])
-        self.source = stream.Endpoint([
-            ("r_wn", 1),
-            ("data", 8),
-        ])
+        self.source = stream.Endpoint(i2c_stream_description)
 
     def elaborate(self, platform):
         sink = self.sink
@@ -132,15 +130,8 @@ class SSD1306(Elaboratable):
         self.reset = Signal()
         self.ready = Signal()
 
-        self.sink = stream.Endpoint([
-            ("data", 8),
-        ])
-        # I2CStream interface
-        self.source = stream.Endpoint([
-            ("r_wn", 1),
-            ("data", 8),
-        ])
-        self.error = Signal()
+        self.sink   = stream.Endpoint([("data", 8)])
+        self.source = stream.Endpoint(i2c_stream_description)
 
     def elaborate(self, platform):
         sink = self.sink
