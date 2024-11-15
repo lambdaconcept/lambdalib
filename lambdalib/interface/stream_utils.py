@@ -10,6 +10,7 @@ __all__ = [
     "Splitter",
     "Merger",
     "LastInserter",
+    "Arbiter",
 ]
 
 
@@ -246,5 +247,78 @@ class LastInserter(Elaboratable):
                     m.d.sync += counter.eq(counter + 1)
                 with m.Else():
                     m.d.sync += counter.eq(0)
+
+        return m
+
+
+class RoundRobin(Elaboratable):
+    """ Fair round robin.
+    """
+    def __init__(self, n):
+        self.n = n
+        self.request = Signal(n)
+        self.grant = Signal(range(n))
+
+    def elaborate(self, platform):
+        m = Module()
+
+        with m.Switch(self.grant):
+            for i in range(self.n):
+                with m.Case(i):
+
+                    cond = m.If
+                    # Loop over all other candidates and grant the
+                    # priority to the next one that requests it.
+                    for j in range(i+1, i+self.n):
+                        nxt = j % self.n
+                        with cond(self.request[nxt]):
+                            m.d.sync += self.grant.eq(nxt)
+                        cond = m.Elif
+
+        return m
+
+
+class Arbiter(Elaboratable):
+    """ Select one stream among all valid sinks and connect it to the source.
+
+    The sinks streams must be delimited with `last`.
+
+    Wait for one transaction to complete (valid & ready & last) before
+    selecting another valid sink.
+
+    sinks: a list of streams to arbiter.
+    """
+    def __init__(self, sinks, source):
+        self.sinks = sinks
+        self.source = source
+
+    def elaborate(self, platform):
+        source = self.source
+
+        m = Module()
+
+        run = Signal()
+
+        valids = Cat(*[s.valid for s in self.sinks])
+        m.submodules.rr = rr = EnableInserter(run)(
+            RoundRobin(len(self.sinks))
+        )
+        m.d.comb += rr.request.eq(valids)
+
+        pending  = source.valid
+        complete = source.valid & source.ready & source.last
+        ongoing  = Signal()
+        with m.If(source.valid & source.ready):
+            m.d.sync += ongoing.eq(~source.last)
+
+        # Run the round robin when:
+        #   the current transaction has completed,
+        #   or nothing is currently ongoing or pending.
+        m.d.comb += run.eq(~(ongoing | pending) | complete)
+
+        with m.Switch(rr.grant):
+            for i, sink in enumerate(self.sinks):
+                with m.Case(i):
+                    m.d.comb += sink.connect(source)
 
         return m
