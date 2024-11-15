@@ -189,6 +189,7 @@ class SSD1306(Elaboratable):
         with m.FSM():
             with m.State("UNKNOWN"):
                 with m.If(self.reset | self.por_init):
+                    m.d.sync += self.ready.eq(0)
                     m.next = "RESET"
 
             with m.State("RESET"):
@@ -196,7 +197,6 @@ class SSD1306(Elaboratable):
                     init   .rewind.eq(1),
                     display.rewind.eq(1),
                 ]
-                m.d.sync += self.ready.eq(0)
                 m.next = "INIT"
 
             with m.State("INIT"):
@@ -212,6 +212,7 @@ class SSD1306(Elaboratable):
 
             with m.State("DISPLAY"):
                 with m.If(self.reset):
+                    m.d.sync += self.ready.eq(0)
                     m.next = "RESET"
 
                 # Send the appropriate sequence to prepare
