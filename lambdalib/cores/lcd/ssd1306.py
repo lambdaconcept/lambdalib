@@ -232,22 +232,28 @@ class SSD1306(Elaboratable):
                         wrapper.sink.last.eq(1),
                     ]
                     with m.If(display.done & ~display.source.valid):
-                        # On the first time after initialization
-                        # we want to clear the frame buffer to make
-                        # sure we do not display crap.
-                        with m.If(~self.ready):
-                            m.next = "CLEAR"
-                        with m.Else():
-                            m.next = "FRAMEBUFFER"
+                        m.next = "FRAMEBUFFER"
 
-            with m.State("CLEAR"):
-                m.d.comb += [
-                    wrapper.sink.valid.eq(1),
-                    wrapper.sink.data .eq(0),   # Black pixels
-                    wrapper.sink.last .eq(cnt == self._size-1),
-                    wrapper.sink.d_cn .eq(1),   # Framebuffer data
-                ]
-                with m.If(wrapper.sink.ready):
+            with m.State("FRAMEBUFFER"):
+                # On the first time after initialization
+                # we want to clear the frame buffer to make
+                # sure we do not display crap.
+                with m.If(~self.ready):
+                    m.d.comb += [
+                        wrapper.sink.valid.eq(1),
+                        wrapper.sink.data .eq(0),       # Black pixels
+                        wrapper.sink.last .eq((cnt == self._size-1)),
+                    ]
+                with m.Else():
+                    m.d.comb += [
+                        wrapper.sink.valid.eq(sink.valid),
+                        wrapper.sink.data .eq(sink.data),
+                        wrapper.sink.last .eq((cnt == self._size-1) | sink.last),
+                        sink.ready        .eq(wrapper.sink.ready),
+                    ]
+                m.d.comb += wrapper.sink.d_cn .eq(1)    # Framebuffer data
+
+                with m.If(wrapper.sink.valid & wrapper.sink.ready):
                     with m.If(~wrapper.sink.last):
                         m.d.sync += cnt.eq(cnt + 1)
                     with m.Else():
@@ -255,14 +261,5 @@ class SSD1306(Elaboratable):
                         m.d.sync += self.ready.eq(1)
                         m.d.comb += display.rewind.eq(1)
                         m.next = "DISPLAY"
-
-            with m.State("FRAMEBUFFER"):
-                m.d.comb += [
-                    sink.connect(wrapper.sink),
-                    wrapper.sink.d_cn.eq(1),
-                ]
-                with m.If(sink.valid & sink.ready & sink.last):
-                    m.d.comb += display.rewind.eq(1)
-                    m.next = "DISPLAY"
 
         return m
