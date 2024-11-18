@@ -45,6 +45,7 @@ class SSD1306_Wrapper(Elaboratable):
             ("data", 8),
         ])
         self.source = stream.Endpoint(i2c_stream_description)
+        self.i2c_error = Signal()
 
     def elaborate(self, platform):
         sink = self.sink
@@ -62,7 +63,10 @@ class SSD1306_Wrapper(Elaboratable):
                     source.valid.eq(sink.valid),
                 ]
                 with m.If(source.valid & source.ready):
-                    m.next = "CONTROL"
+                    with m.If(self.i2c_error):
+                        m.next = "ERROR"
+                    with m.Else():
+                        m.next = "CONTROL"
 
             with m.State("CONTROL"):
                 m.d.comb += [
@@ -83,6 +87,13 @@ class SSD1306_Wrapper(Elaboratable):
                     sink  .ready.eq(source.ready),
                 ]
                 with m.If(source.valid & source.ready & source.last):
+                    m.next = "ADDR"
+
+            with m.State("ERROR"):
+                # The I2C target device is not present on the bus (NAK)
+                # drop the sink until `last`.
+                m.d.comb += sink.ready.eq(1)
+                with m.If(sink.valid & sink.last):
                     m.next = "ADDR"
 
         return m
@@ -132,6 +143,7 @@ class SSD1306(Elaboratable):
 
         self.sink   = stream.Endpoint([("data", 8)])
         self.source = stream.Endpoint(i2c_stream_description)
+        self.i2c_error = Signal()
 
     def elaborate(self, platform):
         sink = self.sink
@@ -183,6 +195,7 @@ class SSD1306(Elaboratable):
         # Instanciate the I2C address and control byte wrapper
         m.submodules.wrapper = wrapper = SSD1306_Wrapper()
         m.d.comb += wrapper.source.connect(source)
+        m.d.comb += wrapper.i2c_error.eq(self.i2c_error)
 
         cnt = Signal(range(self._size))
 
