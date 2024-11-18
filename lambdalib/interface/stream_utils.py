@@ -3,6 +3,7 @@
 from amaranth import *
 
 from . import stream
+from ..cores.time.timer import *
 
 
 __all__ = [
@@ -288,9 +289,10 @@ class Arbiter(Elaboratable):
 
     sinks: a list of streams to arbiter.
     """
-    def __init__(self, sinks, source):
+    def __init__(self, sinks, source, timeout=2**16):
         self.sinks = sinks
         self.source = source
+        self.timeout = timeout
 
     def elaborate(self, platform):
         source = self.source
@@ -311,10 +313,15 @@ class Arbiter(Elaboratable):
         with m.If(source.valid & source.ready):
             m.d.sync += ongoing.eq(~source.last)
 
+        # Prevent a stall if the selected sink stream is no longer valid
+        # for some time but did not give a `last` signal.
+        m.submodules.stall = stall = WaitTimer(self.timeout)
+        m.d.comb += stall.wait.eq(ongoing & ~source.valid & ~run)
+
         # Run the round robin when:
         #   the current transaction has completed,
         #   or nothing is currently ongoing or pending.
-        m.d.comb += run.eq(~(ongoing | pending) | complete)
+        m.d.comb += run.eq(~(ongoing | pending) | complete | stall.done)
 
         with m.Switch(rr.grant):
             for i, sink in enumerate(self.sinks):
