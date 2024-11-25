@@ -11,6 +11,7 @@ __all__ = [
     "Splitter",
     "Merger",
     "LastInserter",
+    "LastOnTimeout",
     "Arbiter",
 ]
 
@@ -248,6 +249,54 @@ class LastInserter(Elaboratable):
                     m.d.sync += counter.eq(counter + 1)
                 with m.Else():
                     m.d.sync += counter.eq(0)
+
+        return m
+
+
+class LastOnTimeout(Elaboratable):
+    """ This module injects a `last` signal into the source stream
+    if no more data is received from the sink stream since more than
+    `timeout` clock cycles.
+
+    Typically this module can be connected to a UART receiver to delimit
+    packets based on the idle time between packets, or to to realign
+    a converter when no more data is received.
+    """
+    def __init__(self, layout, timeout=1):
+        self.timeout = timeout
+        self.sink = stream.Endpoint(layout)
+        self.source = stream.Endpoint(layout)
+
+    def elaborate(self, platform):
+        sink = self.sink
+        source = self.source
+
+        m = Module()
+
+        m.submodules.timer = timer = WaitTimer(self.timeout)
+        m.d.comb += timer.wait.eq(~sink.valid)
+
+        last_r = Signal()
+        loaded = Signal()
+
+        with m.If(sink.valid & sink.ready):
+            m.d.sync += [
+                source.data.eq(sink.data),
+                last_r     .eq(sink.last),
+                loaded     .eq(1),
+            ]
+        with m.Elif(source.valid & source.ready):
+            m.d.sync += loaded.eq(0)
+
+        with m.If(~source.valid | source.ready):
+            m.d.comb += sink.ready.eq(1)
+
+        # We send the data to the source stream immediately
+        # when it was the last data, or when more data is incoming,
+        # or if we waited until the timeout expired.
+        with m.If(loaded & (last_r | sink.valid | timer.done)):
+            m.d.comb += source.valid.eq(1)
+        m.d.comb += source.last.eq(last_r | timer.done)
 
         return m
 

@@ -117,7 +117,30 @@ def test_last_inserter():
         sim.run()
 
 
+def test_last_timeout():
+    lot = LastOnTimeout([("data", 8)], timeout=10)
+    sim = Simulator(lot)
+
+    data = {
+        "data": range(20),
+        "last": [0]*3 + [1] + [0]*10 + [1] + [0]*5,
+    }
+
+    length = len(data["data"])
+    sender = StreamSimSender(lot.sink, data, speed=0.2)
+    receiver = StreamSimReceiver(lot.source,
+                                 length=length,
+                                 speed=0.8, verbose=True)
+
+    sim.add_clock(1e-6)
+    sim.add_sync_process(sender.sync_process)
+    sim.add_sync_process(receiver.sync_process)
+    with sim.write_vcd("tests/test_stream_last_on_timeout.vcd"):
+        sim.run()
+
+
 if __name__ == "__main__":
     test_splitter(); print()
     test_merger(); print()
     test_last_inserter(); print()
+    test_last_timeout(); print()
