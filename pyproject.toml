@@ -11,7 +11,6 @@ dependencies = [
     "luna-usb @ git+https://github.com/lambdaconcept/luna.git",
     "amaranth >= 0.4, < 0.5",
     "amaranth-stdio @ git+https://github.com/amaranth-lang/amaranth-stdio@8ebce9bc535f96a0f479a53f1fa000bff71aceb8",
-    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
     "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc@7b52e9351b1f74a8e727d12f3a91469796aaa0ad",
 ]
 requires-python = ">=3.9"
@@ -31,4 +30,5 @@ test = [
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc",
     "minerva @ git+https://github.com/minerva-cpu/minerva",
     "setuptools",
+    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
 ]
