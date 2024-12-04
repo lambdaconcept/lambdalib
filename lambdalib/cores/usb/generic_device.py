@@ -36,6 +36,7 @@ class USBGenericDevice(Elaboratable):
             with_microsoft_os_1_0=False,        # Set to True for interface 0,
                                                 # or pass a list() of interfaces
             force_contiguous_blockram=False,
+            bufferize_ep_in=True,
             **kwargs):
 
         self.pins = pins
@@ -64,6 +65,7 @@ class USBGenericDevice(Elaboratable):
         self.with_cdc = with_cdc
         self.with_microsoft_os_1_0 = with_microsoft_os_1_0
         self.force_contiguous_blockram = force_contiguous_blockram
+        self.bufferize_ep_in = bufferize_ep_in
 
         self.kwargs = kwargs
 
@@ -204,6 +206,7 @@ class USBGenericDevice(Elaboratable):
                 stream_in_ep = ep_i_cls(
                     endpoint_number=self.BULK_ENDPOINT_NUMBER + k,
                     max_packet_size=i,
+                    bufferize_output=self.bufferize_ep_in,
                 )
                 usb.add_endpoint(stream_in_ep)
                 m.d.comb += self.sinks[k].connect(stream_in_ep.sink)
