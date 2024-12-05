@@ -37,6 +37,7 @@ class USBGenericDevice(Elaboratable):
                                                 # or pass a list() of interfaces
             force_contiguous_blockram=False,
             bufferize_ep_in=True,
+            custom_ep=[],
             **kwargs):
 
         self.pins = pins
@@ -84,6 +85,7 @@ class USBGenericDevice(Elaboratable):
 
         self.tx_activity = Signal(self.ep_pairs)
         self.rx_activity = Signal(self.ep_pairs)
+        self.custom_ep = custom_ep
 
     def create_descriptors(self):
         """ Create the descriptors we want to use for our device. """
@@ -210,6 +212,9 @@ class USBGenericDevice(Elaboratable):
                 )
                 usb.add_endpoint(stream_in_ep)
                 m.d.comb += self.sinks[k].connect(stream_in_ep.sink)
+
+        for ep in self.custom_ep:
+            usb.add_endpoint(ep)
 
         m.d.comb += usb.connect.eq(1)
 
