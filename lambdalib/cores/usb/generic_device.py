@@ -35,7 +35,6 @@ class USBGenericDevice(Elaboratable):
             with_cdc=True,
             with_microsoft_os_1_0=False,        # Set to True for interface 0,
                                                 # or pass a list() of interfaces
-            force_contiguous_blockram=False,
             bufferize_ep_in=True,
             custom_ep=[],
             **kwargs):
@@ -65,7 +64,6 @@ class USBGenericDevice(Elaboratable):
         self.control_ep_handlers = []
         self.with_cdc = with_cdc
         self.with_microsoft_os_1_0 = with_microsoft_os_1_0
-        self.force_contiguous_blockram = force_contiguous_blockram
         self.bufferize_ep_in = bufferize_ep_in
 
         self.kwargs = kwargs
@@ -122,17 +120,6 @@ class USBGenericDevice(Elaboratable):
 
     def add_microsoft_os_1_0(self, descriptors):
         """ Add Microsoft OS 1.0 descriptors for Windows compatibility. """
-
-        if self.force_contiguous_blockram:
-            # This is a workaround for LUNA GetDescriptorHandlerBlock
-            # that only supports contiguous indexes for its ROM layout.
-            # We create fake descriptors as padding, to force BSRAM allocation
-            # for designs where building a non contiguous descriptor in
-            # LUTRAM is not an option (too many resources wasted)
-            # but we can spare some more BSRAM blocks.
-            while descriptors._next_string_index != 0xee:
-                descriptors.get_index_for_string(str(descriptors._next_string_index))
-
         descriptors.add_descriptor(get_string_descriptor("MSFT100\xee"), index=0xee)
 
         msft_descriptors = MicrosoftOS10DescriptorCollection()
@@ -178,7 +165,7 @@ class USBGenericDevice(Elaboratable):
             descriptors,
             # Windows compatible descriptors cannot be build in block ram
             # because MSFT string at index 0xee is not contiguous.
-            avoid_blockram=self.with_microsoft_os_1_0 and not self.force_contiguous_blockram,
+            avoid_blockram=False,
         )
 
         # Add optional custom requests handlers (vendor)
