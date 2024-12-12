@@ -3,6 +3,7 @@ import logging
 from amaranth import *
 from amaranth.hdl.rec import *
 from amaranth.lib import fifo
+from amaranth.sim import Settle, Passive
 
 
 __all__ = ["Endpoint", "SyncFIFO", "AsyncFIFO"]
@@ -66,10 +67,8 @@ class Endpoint(Record):
             for key, val in pkt.items():
                 yield getattr(self, key).eq(val)
 
-            yield
-            elapsed = 1
-
             yield Settle()
+            elapsed = 1
             while not (yield self.ready):
                 yield
                 yield Settle()
@@ -77,6 +76,7 @@ class Endpoint(Record):
                 if elapsed >= timeout:
                     raise Exception("timeout")
 
+            yield
             yield self.valid.eq(0)
 
     def bfm_read(self, timeout=100):
@@ -91,10 +91,14 @@ class Endpoint(Record):
             if elapsed >= timeout:
                 raise Exception("timeout")
 
+        res = {}
+        for key, _ in self.description.payload_layout:
+            res[key] = yield getattr(self, key)
+
         yield
         yield self.ready.eq(0)
 
-        return {key: getattr(self, key) for key, _ in self.description}        
+        return res
 
 
 class _FIFOWrapper:
