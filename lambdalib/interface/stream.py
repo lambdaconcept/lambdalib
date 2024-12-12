@@ -56,6 +56,46 @@ class Endpoint(Record):
         except AttributeError:
             return self.fields["payload"][name]
 
+    def bfm_send(self, pkts, timeout=100):
+        len_pkts = len(pkts)
+        for i, pkt in enumerate(pkts):
+            yield Settle()
+            yield self.valid.eq(1)
+            yield self.first.eq(i == 0)
+            yield self.last .eq(i == len_pkts - 1)
+            for key, val in pkt.items():
+                yield getattr(self, key).eq(val)
+
+            yield
+            elapsed = 1
+
+            yield Settle()
+            while not (yield self.ready):
+                yield
+                yield Settle()
+                elapsed += 1
+                if elapsed >= timeout:
+                    raise Exception("timeout")
+
+            yield self.valid.eq(0)
+
+    def bfm_read(self, timeout=100):
+        elapsed = 0
+
+        yield self.ready.eq(1)
+        yield Settle()
+        while not (yield self.valid):
+            yield
+            yield Settle()
+            elapsed += 1
+            if elapsed >= timeout:
+                raise Exception("timeout")
+
+        yield
+        yield self.ready.eq(0)
+
+        return {key: getattr(self, key) for key, _ in self.description}        
+
 
 class _FIFOWrapper:
     def __init__(self, payload_layout):
