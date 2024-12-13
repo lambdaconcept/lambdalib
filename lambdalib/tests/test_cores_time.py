@@ -3,7 +3,7 @@
 from amaranth import *
 from amaranth.sim import *
 
-from ..cores.time.timer import *
+from lambdalib.cores.time.timer import *
 
 
 def test_timer():
