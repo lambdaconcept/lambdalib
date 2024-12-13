@@ -6,7 +6,13 @@ from amaranth.lib import fifo
 from amaranth.sim import Settle, Passive
 
 
-__all__ = ["Endpoint", "SyncFIFO", "AsyncFIFO"]
+__all__ = [
+    "Endpoint",
+    "SyncFIFO",
+    "AsyncFIFO",
+    "PipeValid",
+    "PipeReady",
+]
 
 
 def _make_fanout(layout):
