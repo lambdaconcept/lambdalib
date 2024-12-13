@@ -28,7 +28,7 @@ test = [
     "pdm[pytest]",
     "pytest-cov",
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc",
-    "minerva @ git+https://github.com/minerva-cpu/minerva",
+    "minerva @ git+https://github.com/minerva-cpu/minerva@e0a565f4e786a6383622fdfa46e14e0c1f51126e",
     "setuptools",
     "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git@d2caa61a1ceb851da8e4e1109fddc56dc29e05ec",
 ]
