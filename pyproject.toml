@@ -30,5 +30,5 @@ test = [
     "lambdasoc @ git+https://github.com/lambdaconcept/lambdasoc",
     "minerva @ git+https://github.com/minerva-cpu/minerva",
     "setuptools",
-    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git",
+    "amaranth-boards @ git+https://github.com/amaranth-lang/amaranth-boards.git@d2caa61a1ceb851da8e4e1109fddc56dc29e05ec",
 ]
