@@ -2,7 +2,7 @@
 
 from amaranth import *
 from amaranth.lib.cdc import *
-from amaranth_stdio.serial import AsyncSerial
+from amaranth_stdio.serial import AsyncSerial, AsyncSerialTX
 
 from .time.timer import *
 from ..interface import stream
@@ -10,8 +10,30 @@ from ..interface import stream
 
 __all__ = [
     "AsyncSerialStream",
+    "AsyncSerialTXStream",
     "AsyncSerialStreamHalfDuplex",
 ]
+
+
+class AsyncSerialTXStream(Elaboratable):
+    def __init__(self, o, *args, **kwargs):
+        self._serial = AsyncSerialTX(*args, **kwargs)
+        self._o = o
+        dw = len(self._serial.data)
+        self.sink = stream.Endpoint([("data", dw)])
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules += self._serial
+
+        m.d.comb += [
+            self._serial.data.eq(self.sink.data),
+            self._serial.ack.eq(self.sink.valid),
+            self.sink.ready.eq(self._serial.rdy),
+            self._o.eq(self._serial.o),
+        ]
+
+        return m
 
 
 class AsyncSerialStream(Elaboratable):
