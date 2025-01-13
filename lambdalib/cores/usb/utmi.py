@@ -35,7 +35,7 @@ class UTMITranslator(Elaboratable):
             o_utmi_rxactive_o=self.utmi.rx_active,
             o_utmi_rxerror_o=self.utmi.rx_error,
             o_utmi_linestate_o=self.utmi.line_state)
-        instance_file = importlib.resources.files() / "ulpi_wrapper.v"
+        instance_file = importlib.resources.files("lambdalib.cores.usb") / "ulpi_wrapper.v"
         with instance_file.open("rt") as f:
             platform.add_file("ulpi_wrapper.v", f)
 
