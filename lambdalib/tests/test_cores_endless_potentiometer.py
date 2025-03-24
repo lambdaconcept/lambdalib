@@ -123,22 +123,18 @@ def test_endless_potentiometer_decoder_single():
     dut = EndlessPotentiometerDecoder(adc_resolution, 5, 0.8)
     sim = Simulator(dut)
 
-    ch_a = {
-        "value": [_wiper_to_adc(90, 0, adc_resolution)],
-        "previous_value": [_wiper_to_adc(0, 0, adc_resolution)],
-    }
-    ch_b = {
-        "value": [_wiper_to_adc(90, 90, adc_resolution)],
-        "previous_value": [_wiper_to_adc(90, 90, adc_resolution)],
+    adc_readout = {
+        "value_a": [_wiper_to_adc(90, 0, adc_resolution)],
+        "previous_value_a": [_wiper_to_adc(0, 0, adc_resolution)],
+        "value_b": [_wiper_to_adc(90, 90, adc_resolution)],
+        "previous_value_b": [_wiper_to_adc(90, 90, adc_resolution)],
     }
 
-    tx_a = StreamSimSender(dut.ch_a, ch_a, speed=0.3)
-    tx_b = StreamSimSender(dut.ch_b, ch_b, speed=0.3)
+    tx = StreamSimSender(dut.adc_readout, adc_readout, speed=0.3)
     rx = StreamSimReceiver(dut.position, 1, speed=0.8, verbose=True)
 
     sim.add_clock(1e-6)
-    sim.add_sync_process(tx_a.sync_process)
-    sim.add_sync_process(tx_b.sync_process)
+    sim.add_sync_process(tx.sync_process)
     sim.add_sync_process(rx.sync_process)
     with sim.write_vcd("tests/test_endless_potentiometer_decoder_single.vcd"):
         sim.run()
@@ -155,22 +151,18 @@ def test_endless_potentiometer_decoder():
     wiper_a = [_wiper_to_adc(x, 0, adc_resolution) for x in range(720)]
     wiper_b = [_wiper_to_adc(x, 90, adc_resolution) for x in range(720)]
 
-    ch_a = {
-        "value": wiper_a[1:],
-        "previous_value": wiper_a[:-1],
-    }
-    ch_b = {
-        "value": wiper_b[1:],
-        "previous_value": wiper_b[:-1],
+    adc_readout = {
+        "value_a": wiper_a[1:],
+        "previous_value_a": wiper_a[:-1],
+        "value_b": wiper_b[1:],
+        "previous_value_b": wiper_b[:-1],
     }
 
-    tx_a = StreamSimSender(dut.ch_a, ch_a, speed=0.3)
-    tx_b = StreamSimSender(dut.ch_b, ch_b, speed=0.3)
-    rx = StreamSimReceiver(dut.position, length=len(ch_a["value"]), speed=0.8, verbose=True)
+    tx = StreamSimSender(dut.adc_readout, adc_readout, speed=0.3)
+    rx = StreamSimReceiver(dut.position, length=len(adc_readout["value_a"]), speed=0.8, verbose=True)
 
     sim.add_clock(1e-6)
-    sim.add_sync_process(tx_a.sync_process)
-    sim.add_sync_process(tx_b.sync_process)
+    sim.add_sync_process(tx.sync_process)
     sim.add_sync_process(rx.sync_process)
     with sim.write_vcd("tests/test_endless_potentiometer_decoder.vcd"):
         sim.run()
