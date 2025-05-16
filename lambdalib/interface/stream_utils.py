@@ -13,6 +13,7 @@ __all__ = [
     "LastInserter",
     "LastOnTimeout",
     "Arbiter",
+    "Gate",
 ]
 
 
@@ -376,5 +377,54 @@ class Arbiter(Elaboratable):
             for i, sink in enumerate(self.sinks):
                 with m.Case(i):
                     m.d.comb += sink.connect(source)
+
+        return m
+
+
+class Gate(Elaboratable):
+    """ This module enables or disables the data flow between
+    sink and source streams.
+
+    param: drop_when_disabled:
+        when set, data from the sink is dropped when the gate is closed.
+        when not set, the data is not consumed from the sink when closed.
+
+    param: wait_last:
+        when set, the gate state will be updated only when receiving
+        the next `last` to avoid cutting in the middle of a packet.
+    """
+    def __init__(self, layout, drop_when_disabled=False, wait_last=False):
+        self.drop_when_disabled = drop_when_disabled
+        self.wait_last = wait_last
+
+        self.enable = Signal()
+        self.sink = stream.Endpoint(layout)
+        self.source = stream.Endpoint(layout)
+
+    def elaborate(self, platform):
+        sink = self.sink
+        source = self.source
+
+        m = Module()
+
+        if self.wait_last:
+            flowing = Signal()
+
+            # Wait for the `last` signal to change the gate state.
+            with m.If(flowing | self.drop_when_disabled):
+                with m.If(sink.valid & sink.ready & sink.last):
+                    m.d.sync += flowing.eq(self.enable)
+            with m.Else():
+                m.d.sync += flowing.eq(self.enable)
+
+        else:
+            flowing = self.enable
+
+        # Connect streams when the gate is open,
+        # or optionally drop data when closed.
+        with m.If(flowing):
+            m.d.comb += sink.connect(source)
+        with m.Else():
+            m.d.comb += sink.ready.eq(self.drop_when_disabled)
 
         return m
