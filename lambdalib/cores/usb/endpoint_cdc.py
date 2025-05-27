@@ -34,6 +34,7 @@ class USBSyncStreamOutEndpoint(USBStreamOutEndpoint):
         m.d.comb += [
             self.source.data.eq(self.stream.payload),
             self.source.valid.eq(self.stream.valid),
+            self.source.first.eq(self.stream.first),
             self.source.last.eq(self.stream.last),
             self.stream.ready.eq(self.source.ready),
         ]
@@ -62,6 +63,7 @@ class USBAsyncStreamOutEndpoint(USBStreamOutEndpoint):
         m.d.comb += [
             cdc_out.sink.data.eq(self.stream.payload),
             cdc_out.sink.valid.eq(self.stream.valid),
+            cdc_out.sink.first.eq(self.stream.first),
             cdc_out.sink.last.eq(self.stream.last),
             self.stream.ready.eq(cdc_out.sink.ready),
         ]
@@ -82,6 +84,7 @@ class USBSyncStreamInEndpoint(USBStreamInEndpoint):
         m.d.comb += [
             self.stream.payload.eq(self.sink.data),
             self.stream.valid.eq(self.sink.valid),
+            self.stream.first.eq(self.sink.first),
             self.stream.last.eq(self.sink.last),
             self.sink.ready.eq(self.stream.ready),
         ]
@@ -110,6 +113,7 @@ class USBAsyncStreamInEndpoint(USBStreamInEndpoint):
         m.d.comb += [
             self.stream.payload.eq(cdc_in.source.data),
             self.stream.valid.eq(cdc_in.source.valid),
+            self.stream.first.eq(cdc_in.source.first),
             self.stream.last.eq(cdc_in.source.last),
             cdc_in.source.ready.eq(self.stream.ready),
         ]
