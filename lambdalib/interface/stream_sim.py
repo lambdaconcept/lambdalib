@@ -16,14 +16,17 @@ __all__ = [
 
 class StreamSimSender:
     def __init__(self, sink, data, speed=0.5, initial_delay=0,
-            verbose=False, decimal=False, strname=""):
+            verbose=False, callback=None, decimal=False, strname="",
+            randomize=True):
         self.sink = sink
         self.data = data
         self.speed = speed
         self.initial_delay = initial_delay
         self.verbose = verbose
+        self.callback = callback
         self.decimal = decimal
         self.strname = strname
+        self.randomize = randomize
 
         if isinstance(self.data, list):
             self.data = {"data": self.data}
@@ -36,6 +39,10 @@ class StreamSimSender:
     def sync_process(self):
         sink = self.sink
 
+        assert (self.speed <= 1)
+        interval = int(1 / self.speed)
+        yieldcnt = 0
+
         for i in range(self.initial_delay):
             yield
 
@@ -44,17 +51,28 @@ class StreamSimSender:
             for k, v in self.data.items():
                 yield getattr(sink, k).eq(v[i])
 
+            if self.randomize:
+                trigger = (random.random() < self.speed)
+            else:
+                trigger = (((yieldcnt+1) % interval) == 0)
+
             if (not (yield sink.valid) \
                     or ((yield sink.valid) and (yield sink.ready))) \
-                    and (random.random() < self.speed):
+                    and trigger:
                 yield sink.valid.eq(1)
 
             yield
+            yieldcnt += 1
 
             if (yield sink.valid) and (yield sink.ready):
                 if self.verbose:
                     for k, v in self.data.items():
                         print(self.strname, "\t", k, hex(v[i]) if not self.decimal else v[i])
+                if self.callback:
+                    current = {}
+                    for k, v in self.data.items():
+                        current[k] = v[i]
+                    self.callback(current)
 
                 i += 1
                 yield sink.valid.eq(0)
