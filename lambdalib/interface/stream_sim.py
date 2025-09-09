@@ -130,6 +130,9 @@ class StreamSimReceiver:
                         if val:
                             print(self.strname, "\t", "[{}]".format(name))
 
+                if self.verbose:
+                    print(self.strname, "\t", "---")
+
                 if self.callback:
                     self.callback(current)
 
