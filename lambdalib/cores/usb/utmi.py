@@ -7,8 +7,9 @@ from luna.gateware.interface.utmi import UTMIInterface
 
 class UTMITranslator(Elaboratable):
     """ULPI-UTMI translator for LUNA wrapping around ultraembedded's core."""
-    def __init__(self, ulpi):
+    def __init__(self, ulpi, reset=True):
         self._ulpi = ulpi
+        self._reset = reset
         self.utmi = UTMIInterface()
 
     def elaborate(self, platform):
@@ -40,12 +41,16 @@ class UTMITranslator(Elaboratable):
             platform.add_file("ulpi_wrapper.v", f)
 
         # POR
-        por_cycles = int(60e6 * 2e-6)  # 2us reset
-        por_cnt = Signal(range(por_cycles), reset=por_cycles - 1)
-        with m.If(por_cnt > 0):
-            m.d.sync += por_cnt.eq(por_cnt - 1)
         por_active = Signal()
-        m.d.comb += por_active.eq(por_cnt > 0)
+        if self._reset:
+            por_cycles = int(60e6 * 2e-6)  # 2us reset
+            por_cnt = Signal(range(por_cycles), reset=por_cycles - 1)
+            with m.If(por_cnt > 0):
+                m.d.sync += por_cnt.eq(por_cnt - 1)
+        
+            m.d.comb += por_active.eq(por_cnt > 0)
+        else:
+            m.d.comb += por_active.eq(0)
 
         # UTMI signals not handled by the translator
         m.d.comb += [
