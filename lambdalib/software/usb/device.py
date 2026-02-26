@@ -69,28 +69,86 @@ class USBEndpoint():
 
 
 class USBDevice():
-    def __init__(self, bulksize, pid=0x1234, vid=0xffff, idx=0, interface=0):
+    def __init__(self, bulksize,
+                 pid=0x1234, vid=0xffff,
+                 idx=None, manufacturer=None, product=None, serial=None,
+                 interface=0):
         self.bulksize = bulksize
         self.pid = pid
         self.vid = vid
         self.interface = interface
 
         self.handle = None
+        self.claimed = False
         self.context = usb1.USBContext()
 
-        index = 0
+        device = self.find_matching_device(vid, pid, idx,
+                                           manufacturer, product, serial)
+        if device is None:
+            raise usb1.USBError(f"Device VID {hex(self.vid)} PID {hex(self.pid)} not present, check udev rules")
+
+        self.handle = device.open()
+
+        try:
+            self.handle.claimInterface(self.interface)
+            self.claimed = True
+        except usb1.USBErrorBusy as e:
+            print("usb1.USBErrorBusy:", e)
+
+        if not self.claimed:
+            self.list_devices()
+
+            d = self.handle.getDevice()
+            m = self.handle.getManufacturer()
+            p = self.handle.getProduct()
+            s = self.handle.getSerialNumber()
+            raise(usb1.USBError(f"Error: Cannot claim interface {self.interface} of: {d} {m} {p} {s}"))
+
+    def find_matching_device(self, vid, pid, idx, manufacturer, product, serial):
+        index = -1
+
         for device in self.context.getDeviceList(skip_on_error=True):
             if device.getVendorID()  == vid and \
                device.getProductID() == pid:
 
-                if index == idx:
-                    self.handle = device.open()
-                    break
                 index += 1
 
-        if self.handle is None:
-            raise usb1.USBError("Device not present, check udev rules")
-        self.handle.claimInterface(self.interface)
+                # Discard non matching strings when provided
+                if (manufacturer is not None) and \
+                   (device.getManufacturer() != manufacturer):
+                    continue
+
+                if (product is not None) and \
+                   (device.getProduct() != product):
+                    continue
+
+                if (serial is not None) and \
+                   (device.getSerialNumber() != serial):
+                    continue
+
+                # Discard non matching index when provided
+                if (idx is not None) and (index != idx):
+                    continue
+
+                # No more reason to discard this device, take it
+                return device
+
+        return None
+
+    def list_devices(self):
+        index = -1
+
+        print(f"Listing USB devices matching VID {hex(self.vid)} PID {hex(self.pid)}:")
+        for device in self.context.getDeviceList(skip_on_error=True):
+            if device.getVendorID()  == self.vid and \
+               device.getProductID() == self.pid:
+
+                index += 1
+
+                m = device.getManufacturer()
+                p = device.getProduct()
+                s = device.getSerialNumber()
+                print(f"    - {index}: {device} {m} {p} {s}")
 
     def control_write(self, *args):
         self.handle.controlWrite(*args)
